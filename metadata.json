@@ -1,0 +1,8 @@
+{
+  "name": "Painel de Operações Terrestres",
+  "description": "Painel tático para acompanhamento de missões terrestres no âmbito do COMAE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
