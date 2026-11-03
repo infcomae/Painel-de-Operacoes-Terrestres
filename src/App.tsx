@@ -17,6 +17,7 @@ import { MissionModal } from './components/MissionModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { CsvExportModal } from './components/CsvExportModal';
 import { SlideExportModal } from './components/SlideExportModal';
+import { HelpModal } from './components/HelpModal';
 import { TimelineSchedule } from './components/TimelineSchedule';
 import { formatDateBr, sanitizeMissionCoordinates } from './utils/csvHelper';
 import {
@@ -29,6 +30,7 @@ import {
   Edit3,
   Filter,
   FolderOpen,
+  HelpCircle,
   MapPin,
   Plus,
   Presentation,
@@ -115,6 +117,7 @@ export default function App() {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState<boolean>(false);
   const [isCsvExportModalOpen, setIsCsvExportModalOpen] = useState<boolean>(false);
   const [isSlideModalOpen, setIsSlideModalOpen] = useState<boolean>(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -496,6 +499,16 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            className="hover:text-amber-300 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            title="Instruções de uso e procedimentos operacionais"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span>Ajuda</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsClearConfirmOpen(true)}
             disabled={missions.length === 0}
             className="hover:text-red-400 disabled:opacity-40 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
@@ -516,8 +529,18 @@ export default function App() {
           </span>
         </nav>
 
-        {/* Zona 3: Ação Primária (+ Novo Registro) */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Zona 3: Ação Primária (+ Novo Registro e Ajuda) */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            className="px-3 py-2 text-xs font-semibold text-[#E2E8E5] bg-[#16221D] hover:bg-[#1E2E27] border border-[#2A3E34] hover:border-amber-400/50 rounded transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            title="Instruções de uso e procedimentos operacionais"
+          >
+            <HelpCircle className="w-4 h-4 text-amber-400" />
+            <span>Ajuda</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -559,6 +582,15 @@ export default function App() {
           >
             <Presentation className="w-3.5 h-3.5 text-emerald-400" />
             <span>Gerar Slide</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            className="text-[#C2CEC8] hover:text-amber-300 flex items-center gap-1 whitespace-nowrap shrink-0"
+            title="Instruções de uso"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span>Ajuda</span>
           </button>
           <button
             type="button"
@@ -1277,6 +1309,18 @@ export default function App() {
             ? `PERÍODO: ATÉ ${formatDateBr(dateEndFilter)}`
             : 'PERÍODO: TODAS AS DATAS'
         }
+      />
+
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+        onOpenSync={() => setIsCsvModalOpen(true)}
+        onOpenNewMission={() => {
+          setEditingMission(null);
+          setIsMissionModalOpen(true);
+        }}
+        onOpenExport={() => setIsCsvExportModalOpen(true)}
+        onOpenSlide={() => setIsSlideModalOpen(true)}
       />
 
       {/* Modal de Confirmação para Limpar Todos os Registros */}
