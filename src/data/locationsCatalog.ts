@@ -72,6 +72,18 @@ export const BRAZIL_LOCATIONS_CATALOG: KnownLocation[] = [
   { name: 'RIACHO DA CRUZ - RN', aliases: ['riacho da cruz'], uf: 'RN', lat: -5.9319, lng: -37.9464 },
   { name: 'SWLB', aliases: ['swlb', 'labrea', 'lábrea'], uf: 'AM', lat: -7.2778, lng: -64.83 },
   { name: 'SBTK', aliases: ['sbtk', 'tarauaca', 'tarauacá'], uf: 'AC', lat: -8.1555, lng: -70.783 },
+  { name: 'SIBH', aliases: ['sibh', 'heliponto sibh'], uf: 'SP', lat: -23.5467, lng: -46.7372 },
+  { name: 'SBYS', aliases: ['sbys', 'pirassununga', 'afa'], uf: 'SP', lat: -21.9858, lng: -47.3419 },
+  { name: 'ZFCB/FORTE COPACABANA', aliases: ['zfcb', 'forte copacabana', 'copacabana'], uf: 'RJ', lat: -22.9867, lng: -43.187 },
+  { name: 'SJZK/PROJAC', aliases: ['sjzk', 'projac', 'curicica'], uf: 'RJ', lat: -22.9575, lng: -43.4042 },
+  { name: 'ZPOB/PARQUE OLIMPICO', aliases: ['zpob', 'parque olimpico', 'parque olímpico'], uf: 'RJ', lat: -22.9772, lng: -43.3958 },
+  { name: 'SBBV', aliases: ['sbbv', 'boa vista'], uf: 'RR', lat: 2.8462, lng: -60.6906 },
+  { name: 'SBBH', aliases: ['sbbh', 'pampulha'], uf: 'MG', lat: -19.85, lng: -43.95 },
+  { name: 'ZPH/JUAZEIRO - BA', aliases: ['juazeiro - ba', 'zph/juazeiro', 'juazeiro'], uf: 'BA', lat: -9.4112, lng: -40.5051 },
+  { name: 'SBPL', aliases: ['sbpl', 'petrolina'], uf: 'PE', lat: -9.3669, lng: -40.5697 },
+  { name: 'SBSL', aliases: ['sbsl', 'sao luis', 'são luís', 'marechal cunha machado'], uf: 'MA', lat: -2.5883, lng: -44.2362 },
+  { name: 'SBCO', aliases: ['sbco', 'canoas', 'baco'], uf: 'RS', lat: -29.9456, lng: -51.1436 },
+  { name: 'SBPA', aliases: ['sbpa', 'salgado filho', 'porto alegre'], uf: 'RS', lat: -29.994, lng: -51.1675 },
 ];
 
 function normalizeText(value: string): string {
@@ -93,6 +105,20 @@ export function findOfflineLocationCoordinates(query: string): {
   const clean = normalizeText(query);
   if (!clean || clean.length < 2) return null;
 
+  // 1ª Passagem: correspondência exata de nome ou alias (ex: códigos ICAO como SBSP, SIBH, SBSL, MANAUS - AM)
+  for (const item of BRAZIL_LOCATIONS_CATALOG) {
+    const itemNameNorm = normalizeText(item.name);
+    if (itemNameNorm === clean || itemNameNorm.split(' - ')[0] === clean) {
+      return { lat: item.lat, lng: item.lng, matchedName: item.name };
+    }
+    for (const alias of item.aliases) {
+      if (normalizeText(alias) === clean) {
+        return { lat: item.lat, lng: item.lng, matchedName: item.name };
+      }
+    }
+  }
+
+  // 2ª Passagem: correspondência parcial por inclusão
   for (const item of BRAZIL_LOCATIONS_CATALOG) {
     const itemNameNorm = normalizeText(item.name);
     if (itemNameNorm.includes(clean) || clean.includes(itemNameNorm.split(' - ')[0])) {

@@ -18,7 +18,7 @@ import { CsvImportModal } from './components/CsvImportModal';
 import { CsvExportModal } from './components/CsvExportModal';
 import { SlideExportModal } from './components/SlideExportModal';
 import { TimelineSchedule } from './components/TimelineSchedule';
-import { formatDateBr } from './utils/csvHelper';
+import { formatDateBr, sanitizeMissionCoordinates } from './utils/csvHelper';
 import {
   Calendar,
   ChevronDown,
@@ -69,13 +69,15 @@ export default function App() {
             parsed[0]?.id === 'mis-001' &&
             parsed[0]?.missao === 'MIS-COMAE-101';
           if (!isLegacyDemo) {
-            return parsed.map((m: Mission) => ({
-              ...m,
-              status:
-                (m.status as string) === 'Agt Execução'
-                  ? 'Agd Execução'
-                  : m.status,
-            }));
+            return parsed.map((m: Mission) =>
+              sanitizeMissionCoordinates({
+                ...m,
+                status:
+                  (m.status as string) === 'Agt Execução'
+                    ? 'Agd Execução'
+                    : m.status,
+              })
+            );
           }
         }
       }

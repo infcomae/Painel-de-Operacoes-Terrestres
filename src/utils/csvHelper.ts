@@ -119,27 +119,85 @@ export function normalizeDate(raw: string): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function parseCoordinate(raw: string, fallback: number, isLat = true): number {
-  if (!raw) return fallback;
-  const cleaned = raw.trim().replace(/\s+/g, '').replace(',', '.');
+const NORTHERN_UFS = [
+  'RR',
+  'AP',
+  'AM',
+  'PA',
+  'MA',
+  'CE',
+  'RN',
+  'PI',
+  'AC',
+  'RO',
+  'PB',
+  'PE',
+  'AL',
+  'SE',
+  'TO',
+];
+
+export function parseCoordinate(
+  raw: string | number | undefined,
+  fallback: number,
+  isLat = true,
+  local = ''
+): number {
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  let cleaned = String(raw).trim().replace(/\s+/g, '').replace(/^["']+|["']+$/g, '');
+  if (!cleaned) return fallback;
+
+  if (cleaned.includes('.') && cleaned.includes(',')) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else {
+    cleaned = cleaned.replace(',', '.');
+  }
+
   let num = parseFloat(cleaned);
   if (!Number.isFinite(num)) return fallback;
 
-  // Corrige deslocamento de casa decimal comum ao exportar 4 casas decimais no Excel (ex: -236.939 -> -23.6939)
+  // Corrige deslocamento de casa decimal comum ao abrir/exportar no Google Sheets / Excel pt-BR (ex: -235.467 -> -23.5467)
   const limit = isLat ? 36 : 76;
   while (Math.abs(num) > limit) {
     num = num / 10;
   }
 
-  // Se houver coordenada de catálogo para o local e a leitura estiver 10x maior (ex: -31.46 vs -3.146 em Manaus/PA)
+  // Se houver coordenada de catálogo para o local e a leitura estiver ~10x maior (ex: -31.019 vs -3.1019 em Manaus, -25.883 vs -2.5883 em SBSL)
   if (
-    Math.abs(num - fallback) > 8 &&
-    Math.abs(num / 10 - fallback) < 1.5
+    Math.abs(num - fallback) > 7 &&
+    Math.abs(num / 10 - fallback) < 2
   ) {
     num = num / 10;
   }
 
+  // Proteção adicional para localidades do Norte/Nordeste com latitude entre 0 e -15 que tenham sido multiplicadas por 10 (ex: -19.922 no PA)
+  if (isLat && num < -15.5 && num / 10 >= -15.5) {
+    const upperLocal = (local || '').toUpperCase();
+    const isNorthernState = NORTHERN_UFS.some(
+      (uf) =>
+        upperLocal.endsWith(`- ${uf}`) ||
+        upperLocal.endsWith(`-${uf}`) ||
+        upperLocal.includes(` ${uf} `) ||
+        upperLocal.endsWith(`/${uf}`)
+    );
+    if (isNorthernState) {
+      num = num / 10;
+    }
+  }
+
   return Number(num.toFixed(4));
+}
+
+export function sanitizeMissionCoordinates(mission: Mission): Mission {
+  const catalogMatch = findOfflineLocationCoordinates(mission.local || '');
+  const defaultLat = catalogMatch ? catalogMatch.lat : -15.8697;
+  const defaultLng = catalogMatch ? catalogMatch.lng : -47.9172;
+
+  return {
+    ...mission,
+    lat: parseCoordinate(mission.lat, defaultLat, true, mission.local),
+    lng: parseCoordinate(mission.lng, defaultLng, false, mission.local),
+  };
 }
 
 function parseLine(line: string, delimiter: string): string[] {
@@ -249,8 +307,8 @@ export function parseMissionsCsv(csvText: string): CsvParseResult {
     const defaultLat = catalogMatch ? catalogMatch.lat : -15.8697;
     const defaultLng = catalogMatch ? catalogMatch.lng : -47.9172;
 
-    const lat = parseCoordinate(cols[idxLat], defaultLat, true);
-    const lng = parseCoordinate(cols[idxLng], defaultLng, false);
+    const lat = parseCoordinate(cols[idxLat], defaultLat, true, local);
+    const lng = parseCoordinate(cols[idxLng], defaultLng, false, local);
     const dataInicio = normalizeDate(cols[idxDataInicio]);
     const dataTermino = normalizeDate(cols[idxDataTermino] || dataInicio);
     const status = normalizeStatus(cols[idxStatus]);
@@ -291,6 +349,16 @@ function escapeCsvCell(value: string | number): string {
   return str;
 }
 
+/**
+ * Formata coordenadas para CSV usando vírgula decimal entre aspas (ex: "-23,5467").
+ * Evita que o Google Sheets / Excel em português (pt-BR) interprete o ponto (.)
+ * como separador de milhar e desconfigure coordenadas de 3 ou 4 casas decimais.
+ */
+function formatCoordinateForCsv(value: number): string {
+  const num = Number.isFinite(value) ? Number(value.toFixed(4)) : 0;
+  return `"${String(num).replace('.', ',')}"`;
+}
+
 function formatCsvTimestamp(date = new Date()): string {
   const yyyy = String(date.getFullYear());
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -306,14 +374,15 @@ export function buildMissionsCsvData(missions: Mission[]): {
 } {
   const rows = [
     CSV_HEADERS.join(','),
-    ...missions.map((m) =>
-      [
+    ...missions.map((rawMission) => {
+      const m = sanitizeMissionCoordinates(rawMission);
+      return [
         escapeCsvCell(m.missao),
         escapeCsvCell(m.operacao),
         escapeCsvCell(m.atividade || ''),
         escapeCsvCell(m.local),
-        m.lat,
-        m.lng,
+        formatCoordinateForCsv(m.lat),
+        formatCoordinateForCsv(m.lng),
         escapeCsvCell(m.dataInicio),
         escapeCsvCell(m.dataTermino),
         escapeCsvCell(m.status),
@@ -322,8 +391,8 @@ export function buildMissionsCsvData(missions: Mission[]): {
         escapeCsvCell(m.fracaoTropa),
         m.qtdMilitares,
         escapeCsvCell(m.indenizacao),
-      ].join(',')
-    ),
+      ].join(',');
+    }),
   ];
 
   const csvContent = '\uFEFF' + rows.join('\r\n');
