@@ -267,6 +267,9 @@ export const CsvExportModal: React.FC<CsvExportModalProps> = ({
                   )}
                   .
                 </div>
+                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 text-[10px] font-mono text-emerald-300">
+                  <span>Lat/Lng padronizadas para Google Sheets (pt-BR)</span>
+                </div>
               </div>
             </div>
             <div className="text-right font-mono shrink-0">

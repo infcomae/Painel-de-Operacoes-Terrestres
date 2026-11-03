@@ -355,14 +355,18 @@ export default function App() {
   ) => {
     if (existingId) {
       setMissions((prev) =>
-        prev.map((m) => (m.id === existingId ? { ...missionData, id: existingId } : m))
+        prev.map((m) =>
+          m.id === existingId
+            ? sanitizeMissionCoordinates({ ...missionData, id: existingId })
+            : m
+        )
       );
       showToast(`Missão ${missionData.missao} atualizada com sucesso.`);
     } else {
-      const newMission: Mission = {
+      const newMission: Mission = sanitizeMissionCoordinates({
         ...missionData,
         id: `mis-${Date.now()}`,
-      };
+      });
       setMissions((prev) => [newMission, ...prev]);
       setSelectedLocationKey(newMission.local);
       showToast(`Novo registro ${newMission.missao} adicionado e salvo em cache.`);
@@ -412,12 +416,13 @@ export default function App() {
   };
 
   const handleImportCsv = (imported: Mission[], mode: 'replace' | 'merge') => {
+    const sanitized = imported.map(sanitizeMissionCoordinates);
     if (mode === 'replace') {
-      setMissions(imported);
-      showToast(`${imported.length} missões importadas substituindo a base anterior.`);
+      setMissions(sanitized);
+      showToast(`${sanitized.length} missões importadas substituindo a base anterior.`);
     } else {
-      setMissions((prev) => [...imported, ...prev]);
-      showToast(`${imported.length} missões mescladas à base atual.`);
+      setMissions((prev) => [...sanitized, ...prev]);
+      showToast(`${sanitized.length} missões mescladas à base atual.`);
     }
   };
 
