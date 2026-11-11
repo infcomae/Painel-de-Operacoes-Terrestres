@@ -11,10 +11,11 @@ import {
   MISSION_STATUSES,
 } from '../types/mission';
 import {
-  findOfflineLocationCoordinates,
-  resolveLocationCoordinates,
-} from '../data/locationsCatalog';
-import { Compass, MapPin, Search, X } from 'lucide-react';
+  searchOnlineLocations,
+  resolveOnlineCoordinates,
+  GeocodingSuggestion,
+} from '../services/geocodingService';
+import { Compass, Globe, Loader2, MapPin, Search, X } from 'lucide-react';
 
 interface MissionModalProps {
   isOpen: boolean;
@@ -49,6 +50,15 @@ export const MissionModal: React.FC<MissionModalProps> = ({
   const [showMapPicker, setShowMapPicker] = useState(true);
   const [formError, setFormError] = useState<string>('');
 
+  // Sugestões de localidades online em tempo real
+  const [suggestions, setSuggestions] = useState<GeocodingSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  const suggestionBoxRef = useRef<HTMLDivElement | null>(null);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const pickerMapRef = useRef<HTMLDivElement | null>(null);
   const leafletPickerRef = useRef<L.Map | null>(null);
   const pickerMarkerRef = useRef<L.Marker | null>(null);
@@ -57,6 +67,10 @@ export const MissionModal: React.FC<MissionModalProps> = ({
     if (!isOpen) return;
     setFormError('');
     setGeoFeedback('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setIsLoadingSuggestions(false);
+    setHighlightedIndex(-1);
 
     if (initialMission) {
       setMissao(initialMission.missao);
@@ -199,39 +213,114 @@ export const MissionModal: React.FC<MissionModalProps> = ({
     }
   }, [lat, lng]);
 
-  if (!isOpen) return null;
+  // Fecha o dropdown de sugestões ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        suggestionBoxRef.current &&
+        !suggestionBoxRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // Ao alterar o campo Local, tenta preencher automaticamente pelo catálogo offline
-  const handleLocalChange = (newLocal: string) => {
-    setLocal(newLocal);
-    const match = findOfflineLocationCoordinates(newLocal);
-    if (match) {
-      setLat(String(match.lat));
-      setLng(String(match.lng));
-      setGeoFeedback(`Coordenadas preenchidas automaticamente (${match.matchedName})`);
+  // Limpa o timer de busca ao desmontar
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Digitação no campo Local com busca de sugestões online em tempo real
+  const handleLocalInputChange = (value: string) => {
+    setLocal(value);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+
+    const query = value.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    searchTimerRef.current = setTimeout(async () => {
+      const results = await searchOnlineLocations(query, 6);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+      setHighlightedIndex(-1);
+      setIsLoadingSuggestions(false);
+    }, 350);
+  };
+
+  // Seleção de uma sugestão online
+  const handleSelectSuggestion = (suggestion: GeocodingSuggestion) => {
+    const formattedLocal =
+      suggestion.cityOrState && !suggestion.name.includes(suggestion.cityOrState)
+        ? `${suggestion.name} - ${suggestion.cityOrState}`
+        : suggestion.name;
+
+    setLocal(formattedLocal);
+    setLat(String(suggestion.lat));
+    setLng(String(suggestion.lng));
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setGeoFeedback(
+      `Coordenadas obtidas online via OpenStreetMap (${suggestion.name}): ${suggestion.lat}, ${suggestion.lng}`
+    );
+  };
+
+  // Navegação por teclado nas sugestões (setas cima/baixo, Enter e Esc)
+  const handleLocalKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+    } else if (e.key === 'Enter') {
+      if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[highlightedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
     }
   };
 
-  // Busca ativa de coordenadas (offline catalog + online Nominatim)
+  // Consulta online ativa de coordenadas pelo botão 'Obter Lat/Lng'
   const handleLookupCoordinates = async () => {
     if (!local.trim()) {
       setGeoFeedback('Preencha o campo Local antes de buscar as coordenadas.');
       return;
     }
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
     setIsSearchingGeo(true);
-    setGeoFeedback('Buscando coordenadas para a localidade informada...');
-    const resolved = await resolveLocationCoordinates(local);
+    setGeoFeedback('Consultando coordenadas online (OpenStreetMap)...');
+    const resolved = await resolveOnlineCoordinates(local);
     setIsSearchingGeo(false);
 
     if (resolved) {
       setLat(String(resolved.lat));
       setLng(String(resolved.lng));
       setGeoFeedback(
-        `Coordenadas localizadas (${resolved.source === 'offline' ? 'Base Tática Offline' : 'Geocodificação Online'}): ${resolved.lat}, ${resolved.lng}`
+        `Coordenadas localizadas online (OpenStreetMap · ${resolved.name}): ${resolved.lat}, ${resolved.lng}`
       );
     } else {
       setGeoFeedback(
-        'Local não encontrado automaticamente. Clique diretamente no mapa ao lado para marcar o ponto.'
+        'Localidade não encontrada na consulta online. Ajuste o termo ou clique diretamente no mapa ao lado para marcar o ponto.'
       );
     }
   };
@@ -299,6 +388,8 @@ export const MissionModal: React.FC<MissionModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto">
       <div className="w-full max-w-4xl bg-[#121916] border border-[#2A3C34] rounded-md shadow-2xl overflow-hidden my-auto">
@@ -309,7 +400,7 @@ export const MissionModal: React.FC<MissionModalProps> = ({
               {initialMission ? `Editar Registro · ${initialMission.missao}` : 'Novo Registro de Missão Operacional'}
             </h2>
             <p className="text-xs text-[#94A39E] mt-0.5">
-              Preencha os dados estruturados da missão. As coordenadas são obtidas automaticamente pelo local ou clicando no mapa.
+              Preencha os dados estruturados da missão. As coordenadas e sugestões são obtidas online em tempo real (OpenStreetMap) ou clicando no mapa.
             </p>
           </div>
           <button
@@ -373,31 +464,123 @@ export const MissionModal: React.FC<MissionModalProps> = ({
                 />
               </div>
 
-              {/* Campo Local com Botão de Geocodificação (sem lista suspensa) */}
-              <div>
-                <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
-                  Local (Cidade / Base / Guarnição) *
-                </label>
+              {/* Campo Local com Sugestões Online em Tempo Real */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-[#C2CEC8]">
+                    Local (Cidade / Base / Guarnição) *
+                  </label>
+                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-emerald-400" />
+                    Consulta Online (OpenStreetMap)
+                  </span>
+                </div>
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={local}
-                    onChange={(e) => handleLocalChange(e.target.value)}
-                    placeholder="Ex: SBMN, SÃO PAULO - SP"
-                    className="flex-1 px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
-                  />
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      required
+                      value={local}
+                      onChange={(e) => handleLocalInputChange(e.target.value)}
+                      onKeyDown={handleLocalKeyDown}
+                      onFocus={() => {
+                        if (suggestions.length > 0 && local.trim().length >= 2) {
+                          setShowSuggestions(true);
+                        }
+                      }}
+                      placeholder="Ex: Manaus, SBSP, Anápolis, Boa Vista"
+                      autoComplete="off"
+                      className="w-full pl-3 pr-8 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
+                    />
+                    {isLoadingSuggestions && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={handleLookupCoordinates}
-                    disabled={isSearchingGeo}
-                    className="px-3 py-2 bg-[#1A2621] hover:bg-[#22322B] text-emerald-300 border border-emerald-500/30 rounded text-xs font-medium flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
-                    title="Obter Latitude e Longitude automaticamente a partir do Local"
+                    disabled={isSearchingGeo || !local.trim()}
+                    className="px-3 py-2 bg-[#1A2621] hover:bg-[#22322B] text-emerald-300 border border-emerald-500/30 rounded text-xs font-medium flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Consultar coordenadas online a partir do Local digitado"
                   >
-                    <Search className="w-3.5 h-3.5" />
-                    <span>{isSearchingGeo ? 'Buscando...' : 'Obter Lat/Lng'}</span>
+                    {isSearchingGeo ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Buscando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Obter Lat/Lng</span>
+                      </>
+                    )}
                   </button>
                 </div>
+
+                {/* Dropdown Flutuante de Sugestões Online */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div
+                    ref={suggestionBoxRef}
+                    className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#101714] border border-[#2A3C34] rounded-md shadow-2xl overflow-hidden max-h-64 overflow-y-auto"
+                  >
+                    <div className="px-3 py-1.5 bg-[#14201B] border-b border-[#24332C] flex items-center justify-between text-[10px] text-[#889992] font-mono uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5 text-emerald-400">
+                        <Globe className="w-3 h-3" />
+                        Sugestões Online
+                      </span>
+                      <span>{suggestions.length} encontrados</span>
+                    </div>
+
+                    <div className="divide-y divide-[#1D2924]">
+                      {suggestions.map((item, idx) => {
+                        const isHighlighted = idx === highlightedIndex;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectSuggestion(item)}
+                            onMouseEnter={() => setHighlightedIndex(idx)}
+                            className={`w-full text-left px-3 py-2.5 flex items-start justify-between gap-3 transition-colors cursor-pointer ${
+                              isHighlighted
+                                ? 'bg-emerald-500/20 text-[#F1F5F3]'
+                                : 'hover:bg-[#16231D] text-[#C2CEC8]'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <MapPin
+                                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                                  isHighlighted ? 'text-emerald-400' : 'text-[#6A7F75]'
+                                }`}
+                              />
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold text-[#F1F5F3] truncate">
+                                  {item.name}
+                                </div>
+                                <div className="text-[11px] text-[#889992] truncate">
+                                  {item.cityOrState}
+                                  {item.category ? ` · ${item.category}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#0A100E] border border-[#23352D] text-emerald-300 tabular-nums">
+                                {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="px-3 py-1.5 bg-[#0D1412] border-t border-[#1E2B25] text-[10px] text-[#6A7F75] flex items-center justify-between font-mono">
+                      <span>Clique ou use ↑ ↓ + Enter para preencher</span>
+                      <span>Esc para fechar</span>
+                    </div>
+                  </div>
+                )}
+
                 {geoFeedback && (
                   <p className="mt-1 text-[11px] text-emerald-400 font-mono">
                     {geoFeedback}

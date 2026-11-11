@@ -6,7 +6,6 @@ import {
   MISSION_ACTIONS,
   MISSION_INDENIZACOES,
 } from '../types/mission';
-import { findOfflineLocationCoordinates } from '../data/locationsCatalog';
 
 export const CSV_HEADERS = [
   'Missão',
@@ -189,9 +188,8 @@ export function parseCoordinate(
 }
 
 export function sanitizeMissionCoordinates(mission: Mission): Mission {
-  const catalogMatch = findOfflineLocationCoordinates(mission.local || '');
-  const defaultLat = catalogMatch ? catalogMatch.lat : -15.8697;
-  const defaultLng = catalogMatch ? catalogMatch.lng : -47.9172;
+  const defaultLat = -15.8697;
+  const defaultLng = -47.9172;
 
   return {
     ...mission,
@@ -301,11 +299,8 @@ export function parseMissionsCsv(csvText: string): CsvParseResult {
     const operacao = cols[idxOperacao] || 'Operação Não Especificada';
     const atividade = idxAtividade >= 0 ? (cols[idxAtividade] || '').trim() || undefined : undefined;
     const local = cols[idxLocal] || 'Brasília - DF (BABR / COMAE)';
-
-    // Caso a planilha não traga Lat/Lng preenchidas, tenta resolver pelo nome do Local
-    const catalogMatch = findOfflineLocationCoordinates(local);
-    const defaultLat = catalogMatch ? catalogMatch.lat : -15.8697;
-    const defaultLng = catalogMatch ? catalogMatch.lng : -47.9172;
+    const defaultLat = -15.8697;
+    const defaultLng = -47.9172;
 
     const lat = parseCoordinate(cols[idxLat], defaultLat, true, local);
     const lng = parseCoordinate(cols[idxLng], defaultLng, false, local);

@@ -237,10 +237,10 @@ export default function App() {
     return missionsMatchingBaseFilters.filter((m) => m.status === statusFilter);
   }, [missionsMatchingBaseFilters, statusFilter]);
 
-  // Total de militares nas missões filtradas
-  const totalFilteredMilitares = useMemo(() => {
-    return filteredMissions.reduce((acc, m) => acc + (m.qtdMilitares || 0), 0);
-  }, [filteredMissions]);
+  // Total de militares do card Total de Missões (não é alterado ao selecionar cards de status)
+  const totalBaseMilitares = useMemo(() => {
+    return missionsMatchingBaseFilters.reduce((acc, m) => acc + (m.qtdMilitares || 0), 0);
+  }, [missionsMatchingBaseFilters]);
 
   // Agrupamento das missões filtradas por Local
   const locationGroups = useMemo<LocationGroup[]>(() => {
@@ -635,7 +635,7 @@ export default function App() {
                   {missionsMatchingBaseFilters.length}
                 </span>
                 <span className="font-mono text-[11px] text-[#889992] tabular-nums whitespace-nowrap">
-                  {totalFilteredMilitares} mil.
+                  {totalBaseMilitares} mil.
                 </span>
               </div>
               <div className="mt-1 text-[11px] text-[#7A8C85] truncate">
