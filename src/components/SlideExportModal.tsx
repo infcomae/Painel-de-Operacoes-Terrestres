@@ -10,9 +10,11 @@ import { formatDateBr } from '../utils/csvHelper';
 import {
   Check,
   Copy,
+  Crosshair,
   Download,
   Image as ImageIcon,
   Loader2,
+  Maximize2,
   Moon,
   RefreshCw,
   Sun,
@@ -319,6 +321,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 }) => {
   const [slideTheme, setSlideTheme] = useState<'dark' | 'light'>('dark');
   const [slideTitle, setSlideTitle] = useState<string>('OPERAÇÕES TERRESTRES');
+  const [mapFrameMode, setMapFrameMode] = useState<'brazil' | 'fit'>('brazil');
   const [previewDataUrl, setPreviewDataUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copyFeedback, setCopyFeedback] = useState<string>('');
@@ -627,19 +630,56 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     ctx.fill();
     ctx.clip();
 
-    const mapZoom = 5;
-    const centerLat = -14.2;
-    const centerLng = -52.5;
+    let centerLat = -14.2;
+    let centerLng = -52.5;
+    let mapZoom = 5;
+    let targetMinLng = -74.5;
+    let targetMaxLng = -33.5;
+    let targetMinLat = -34.2;
+    let targetMaxLat = 6.0;
+
+    // Se o modo for 'fit', enquadra exatamente as localidades com missões ativas
+    if (mapFrameMode === 'fit' && locationGroups.length > 0) {
+      const lats = locationGroups.map((g) => g.lat);
+      const lngs = locationGroups.map((g) => g.lng);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+
+      const latSpread = maxLat - minLat;
+      const lngSpread = maxLng - minLng;
+      // Adiciona margem proporcional para garantir que os pinos e rótulos não fiquem colados na borda
+      const padLat = Math.max(1.8, latSpread * 0.25);
+      const padLng = Math.max(2.2, lngSpread * 0.25);
+
+      targetMinLat = minLat - padLat;
+      targetMaxLat = maxLat + padLat;
+      targetMinLng = minLng - padLng;
+      targetMaxLng = maxLng + padLng;
+
+      centerLat = (minLat + maxLat) / 2;
+      centerLng = (minLng + maxLng) / 2;
+
+      const maxSpan = Math.max(targetMaxLat - targetMinLat, (targetMaxLng - targetMinLng) * 0.75);
+      if (maxSpan > 25) mapZoom = 4;
+      else if (maxSpan > 12) mapZoom = 5;
+      else if (maxSpan > 6) mapZoom = 6;
+      else if (maxSpan > 3) mapZoom = 7;
+      else if (maxSpan > 1.5) mapZoom = 8;
+      else mapZoom = 9;
+    }
+
     const centerWorldX = lngToWorldX(centerLng, mapZoom);
     const centerWorldY = latToWorldY(centerLat, mapZoom);
 
-    const brLeftX = lngToWorldX(-74.5, mapZoom);
-    const brRightX = lngToWorldX(-33.5, mapZoom);
-    const brTopY = latToWorldY(6.0, mapZoom);
-    const brBottomY = latToWorldY(-34.2, mapZoom);
+    const targetLeftX = lngToWorldX(targetMinLng, mapZoom);
+    const targetRightX = lngToWorldX(targetMaxLng, mapZoom);
+    const targetTopY = latToWorldY(targetMaxLat, mapZoom);
+    const targetBottomY = latToWorldY(targetMinLat, mapZoom);
 
-    const scaleX = mapW / (brRightX - brLeftX);
-    const scaleY = mapH / (brBottomY - brTopY);
+    const scaleX = mapW / Math.max(1, Math.abs(targetRightX - targetLeftX));
+    const scaleY = mapH / Math.max(1, Math.abs(targetBottomY - targetTopY));
     const mapScale = Math.min(scaleX, scaleY);
 
     const worldToCanvas = (wx: number, wy: number) => ({
@@ -667,8 +707,11 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       ty: number;
     }>[] = [];
 
-    for (let tx = minTileX; tx <= maxTileX; tx++) {
-      for (let ty = minTileY; ty <= maxTileY; ty++) {
+    const clampedMaxTx = Math.min(maxTileX, minTileX + 6);
+    const clampedMaxTy = Math.min(maxTileY, minTileY + 6);
+
+    for (let tx = minTileX; tx <= clampedMaxTx; tx++) {
+      for (let ty = minTileY; ty <= clampedMaxTy; ty++) {
         const url = `https://tile.openstreetmap.org/${mapZoom}/${tx}/${ty}.png`;
         tilePromises.push(loadTileImage(url).then((img) => ({ img, tx, ty })));
       }
@@ -1044,6 +1087,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     isOpen,
     slideTheme,
     slideTitle,
+    mapFrameMode,
     operationLanes,
     timeMarkers,
     locationGroups,
@@ -1174,25 +1218,59 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
           </div>
         </div>
 
-        {/* Barra de Ajuste Rápido do Título e Feedback */}
+        {/* Barra de Ajuste Rápido do Título, Enquadramento e Feedback */}
         <div className="px-6 py-2.5 bg-[#101714] border-b border-[#24332C] flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <label className="text-[#889992] font-medium">Título do Slide:</label>
-            <input
-              type="text"
-              value={slideTitle}
-              onChange={(e) => setSlideTitle(e.target.value)}
-              className="px-2.5 py-1 bg-[#0B0F0E] border border-[#263530] rounded text-xs font-mono text-[#F1F5F3] focus:outline-none focus:border-emerald-500 w-64"
-            />
-            <button
-              type="button"
-              onClick={generateSlideCanvas}
-              className="px-2 py-1 bg-[#16211C] hover:bg-[#1E2D26] text-[#C2CEC8] border border-[#263530] rounded flex items-center gap-1 cursor-pointer"
-              title="Atualizar prévia da imagem"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Atualizar</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-[#889992] font-medium">Título do Slide:</label>
+              <input
+                type="text"
+                value={slideTitle}
+                onChange={(e) => setSlideTitle(e.target.value)}
+                className="px-2.5 py-1 bg-[#0B0F0E] border border-[#263530] rounded text-xs font-mono text-[#F1F5F3] focus:outline-none focus:border-emerald-500 w-64"
+              />
+              <button
+                type="button"
+                onClick={generateSlideCanvas}
+                className="px-2 py-1 bg-[#16211C] hover:bg-[#1E2D26] text-[#C2CEC8] border border-[#263530] rounded flex items-center gap-1 cursor-pointer"
+                title="Atualizar prévia da imagem"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Atualizar</span>
+              </button>
+            </div>
+
+            {/* Controles de Enquadramento do Mapa (semelhante aos do painel) */}
+            <div className="flex items-center bg-[#0B0F0E] border border-[#263530] rounded p-0.5 text-xs">
+              <span className="text-[11px] text-[#7A8C85] px-2 font-medium">Mapa:</span>
+              <button
+                type="button"
+                onClick={() => setMapFrameMode('fit')}
+                disabled={locationGroups.length === 0}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-40 ${
+                  mapFrameMode === 'fit'
+                    ? 'bg-[#1D2B25] text-emerald-300 font-semibold border border-emerald-500/40'
+                    : 'text-[#C2CEC8] hover:text-white hover:bg-[#16211C]'
+                }`}
+                title="Enquadrar todas as missões no mapa da imagem"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>Enquadrar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapFrameMode('brazil')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                  mapFrameMode === 'brazil'
+                    ? 'bg-[#1D2B25] text-emerald-300 font-semibold border border-emerald-500/40'
+                    : 'text-[#C2CEC8] hover:text-white hover:bg-[#16211C]'
+                }`}
+                title="Retornar ao enquadramento geral do Brasil"
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>Brasil</span>
+              </button>
+            </div>
           </div>
 
           {copyFeedback ? (
