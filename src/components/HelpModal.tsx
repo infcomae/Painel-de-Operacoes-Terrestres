@@ -283,13 +283,24 @@ export const HelpModal: React.FC<HelpModalProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-[#A2B3AC] mt-1.5 leading-relaxed">
-                    Para incluir uma nova missão, clique no botão{' '}
+                    Para incluir uma nova missão em branco, clique no botão{' '}
                     <strong className="text-emerald-300 font-semibold">+ Novo Registro</strong> no canto superior direito do painel.
                   </p>
                   <p className="text-xs text-[#889992] mt-1 leading-relaxed">
                     Preencha os campos da missão no modal aberto (código da missão, operação, tipo de ação, datas, unidade executora, efetivo e coordenadas) e clique em{' '}
-                    <strong className="text-[#F1F5F3]">"Salvar Missão"</strong>.
+                    <strong className="text-[#F1F5F3]">"Confirmar Novo Registro"</strong>.
                   </p>
+
+                  {/* Complemento: Funcionalidade de Clonar Missão */}
+                  <div className="mt-3 bg-[#0A100E] border border-[#1E2B25] rounded-md p-2.5">
+                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-emerald-300">
+                      <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Opção Rápida: Clonar Missão Existente</span>
+                    </div>
+                    <p className="text-[11px] text-[#A2B3AC] leading-relaxed">
+                      Para criar um novo lançamento reaproveitando os dados de uma missão já existente, clique no botão de clonar (<strong className="text-emerald-300">ícone de cópia</strong> localizado entre os botões de editar e excluir no card da missão). A janela de novo registro será aberta com todas as informações pré-preenchidas, mantendo apenas o período (<strong className="text-[#F1F5F3]">data de início e término em branco</strong>) para preenchimento das novas datas da operação.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

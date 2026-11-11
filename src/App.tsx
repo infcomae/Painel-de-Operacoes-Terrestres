@@ -27,6 +27,7 @@ import {
   Crosshair,
   Database,
   Download,
+  Copy,
   Edit3,
   Filter,
   FolderOpen,
@@ -114,6 +115,7 @@ export default function App() {
   const [collapsedLocations, setCollapsedLocations] = useState<Record<string, boolean>>({});
   const [isMissionModalOpen, setIsMissionModalOpen] = useState<boolean>(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
+  const [isCloneModal, setIsCloneModal] = useState<boolean>(false);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState<boolean>(false);
   const [isCsvExportModalOpen, setIsCsvExportModalOpen] = useState<boolean>(false);
   const [isSlideModalOpen, setIsSlideModalOpen] = useState<boolean>(false);
@@ -545,6 +547,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setEditingMission(null);
+              setIsCloneModal(false);
               setIsMissionModalOpen(true);
             }}
             className="px-4 py-2 text-xs font-semibold text-[#08120E] bg-emerald-400 hover:bg-emerald-300 rounded transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
@@ -983,6 +986,7 @@ export default function App() {
                           type="button"
                           onClick={() => {
                             setEditingMission(null);
+                            setIsCloneModal(false);
                             setIsMissionModalOpen(true);
                           }}
                           className="px-3.5 py-2 text-xs font-semibold text-[#08120E] bg-emerald-400 hover:bg-emerald-300 rounded flex items-center gap-1.5 cursor-pointer"
@@ -1162,12 +1166,27 @@ export default function App() {
                                       type="button"
                                       onClick={() => {
                                         setEditingMission(mission);
+                                        setIsCloneModal(false);
                                         setIsMissionModalOpen(true);
                                       }}
                                       className="p-1 text-[#889992] hover:text-white hover:bg-[#1B2622] rounded transition-colors cursor-pointer"
                                       title="Editar missão"
                                     >
                                       <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingMission(mission);
+                                        setIsCloneModal(true);
+                                        setIsMissionModalOpen(true);
+                                      }}
+                                      className="p-1 text-[#889992] hover:text-emerald-400 hover:bg-[#1B2622] rounded transition-colors cursor-pointer"
+                                      title="Clonar missão (novo registro)"
+                                      aria-label={`Clonar missão ${mission.missao}`}
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
                                     </button>
 
                                     <button
@@ -1260,6 +1279,7 @@ export default function App() {
           onSelectLocation={handleSelectLocationFromMap}
           onEditMission={(m) => {
             setEditingMission(m);
+            setIsCloneModal(false);
             setIsMissionModalOpen(true);
           }}
         />
@@ -1271,9 +1291,11 @@ export default function App() {
       <MissionModal
         isOpen={isMissionModalOpen}
         initialMission={editingMission}
+        isClone={isCloneModal}
         onClose={() => {
           setIsMissionModalOpen(false);
           setEditingMission(null);
+          setIsCloneModal(false);
         }}
         onSave={handleSaveMission}
       />
@@ -1317,6 +1339,7 @@ export default function App() {
         onOpenSync={() => setIsCsvModalOpen(true)}
         onOpenNewMission={() => {
           setEditingMission(null);
+          setIsCloneModal(false);
           setIsMissionModalOpen(true);
         }}
         onOpenExport={() => setIsCsvExportModalOpen(true)}

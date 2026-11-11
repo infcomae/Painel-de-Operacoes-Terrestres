@@ -20,6 +20,7 @@ import { Compass, Globe, Loader2, MapPin, Search, X } from 'lucide-react';
 interface MissionModalProps {
   isOpen: boolean;
   initialMission: Mission | null;
+  isClone?: boolean;
   onClose: () => void;
   onSave: (missionData: Omit<Mission, 'id'>, existingId?: string) => void;
 }
@@ -27,6 +28,7 @@ interface MissionModalProps {
 export const MissionModal: React.FC<MissionModalProps> = ({
   isOpen,
   initialMission,
+  isClone = false,
   onClose,
   onSave,
 }) => {
@@ -79,8 +81,8 @@ export const MissionModal: React.FC<MissionModalProps> = ({
       setLocal(initialMission.local);
       setLat(String(initialMission.lat));
       setLng(String(initialMission.lng));
-      setDataInicio(initialMission.dataInicio);
-      setDataTermino(initialMission.dataTermino);
+      setDataInicio(isClone ? '' : initialMission.dataInicio);
+      setDataTermino(isClone ? '' : initialMission.dataTermino);
       setStatus(initialMission.status);
       setUnidadeExecutora(initialMission.unidadeExecutora);
       setAcao(initialMission.acao);
@@ -383,7 +385,7 @@ export const MissionModal: React.FC<MissionModalProps> = ({
         qtdMilitares: parsedQtd,
         indenizacao,
       },
-      initialMission?.id
+      isClone ? undefined : initialMission?.id
     );
     onClose();
   };
@@ -397,10 +399,16 @@ export const MissionModal: React.FC<MissionModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 bg-[#16201C] border-b border-[#263530]">
           <div>
             <h2 className="font-display text-xl font-bold tracking-wide text-[#F1F5F3]">
-              {initialMission ? `Editar Registro · ${initialMission.missao}` : 'Novo Registro de Missão Operacional'}
+              {initialMission && !isClone
+                ? `Editar Registro · ${initialMission.missao}`
+                : isClone
+                ? `Novo Registro (Clonado de ${initialMission?.missao})`
+                : 'Novo Registro de Missão Operacional'}
             </h2>
             <p className="text-xs text-[#94A39E] mt-0.5">
-              Preencha os dados estruturados da missão. As coordenadas e sugestões são obtidas online em tempo real (OpenStreetMap) ou clicando no mapa.
+              {isClone
+                ? 'Dados pré-carregados da missão clonada. Preencha o período (data início e término) para confirmar o novo registro.'
+                : 'Preencha os dados estruturados da missão. As coordenadas e sugestões são obtidas online em tempo real (OpenStreetMap) ou clicando no mapa.'}
             </p>
           </div>
           <button
@@ -795,7 +803,7 @@ export const MissionModal: React.FC<MissionModalProps> = ({
               type="submit"
               className="px-5 py-2 text-xs font-semibold text-[#08120E] bg-emerald-400 hover:bg-emerald-300 rounded transition-colors cursor-pointer"
             >
-              {initialMission ? 'Salvar Alterações' : 'Confirmar Novo Registro'}
+              {initialMission && !isClone ? 'Salvar Alterações' : 'Confirmar Novo Registro'}
             </button>
           </div>
         </form>
