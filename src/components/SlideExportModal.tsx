@@ -403,15 +403,21 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     const lanesByOp: SlideOperationLane[] = Object.entries(byOp)
       .map(([operationName, opMissions]) => {
-        const byLocal: Record<string, Mission[]> = {};
+        // Agrupa missões dentro da mesma operação mantendo juntas apenas as que possuírem
+        // a mesma Unidade Executora, o mesmo Local e Períodos iguais (data início e término)
+        const byUnitLocPeriod: Record<string, Mission[]> = {};
         opMissions.forEach((m) => {
+          const unit = m.unidadeExecutora.trim();
           const loc = m.local.trim();
-          if (!byLocal[loc]) byLocal[loc] = [];
-          byLocal[loc].push(m);
+          const start = m.dataInicio.trim();
+          const end = m.dataTermino.trim();
+          const groupKey = `${unit}__${loc}__${start}__${end}`;
+          if (!byUnitLocPeriod[groupKey]) byUnitLocPeriod[groupKey] = [];
+          byUnitLocPeriod[groupKey].push(m);
         });
 
-        const mergedCards: SlideTimelineCard[] = Object.entries(byLocal).map(
-          ([localName, locMissions]) => {
+        const mergedCards: SlideTimelineCard[] = Object.entries(byUnitLocPeriod).map(
+          ([groupKey, locMissions]) => {
             const sortedLoc = [...locMissions].sort(
               (a, b) =>
                 SLIDE_TIMELINE_STATUS_ORDER[a.status] -
@@ -420,14 +426,10 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
                 a.missao.localeCompare(b.missao)
             );
 
-            let minInicio = sortedLoc[0].dataInicio;
-            let maxTermino = sortedLoc[0].dataTermino;
             let dominantStatus: MissionStatus = sortedLoc[0].status;
             let bestPriority = SLIDE_TIMELINE_STATUS_ORDER[dominantStatus];
 
             sortedLoc.forEach((m) => {
-              if (m.dataInicio < minInicio) minInicio = m.dataInicio;
-              if (m.dataTermino > maxTermino) maxTermino = m.dataTermino;
               const prio = SLIDE_TIMELINE_STATUS_ORDER[m.status];
               if (prio < bestPriority) {
                 bestPriority = prio;
@@ -442,13 +444,17 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
               new Set(sortedLoc.map((m) => m.unidadeExecutora.trim()))
             );
 
+            const cardLocal = sortedLoc[0].local.trim();
+            const cardInicio = sortedLoc[0].dataInicio;
+            const cardTermino = sortedLoc[0].dataTermino;
+
             return {
-              id: `${operationName}__${localName}`,
-              local: localName,
+              id: `${operationName}__${groupKey}`,
+              local: cardLocal,
               missaoLabel: uniqueMissoes.join(' / '),
               unidadeLabel: uniqueUnidades.join(' · '),
-              dataInicio: minInicio,
-              dataTermino: maxTermino,
+              dataInicio: cardInicio,
+              dataTermino: cardTermino,
               dominantStatus,
             };
           }

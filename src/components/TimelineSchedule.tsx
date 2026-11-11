@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Mission, MissionStatus, STATUS_CONFIG, MISSION_STATUSES } from '../types/mission';
-import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, Shield } from 'lucide-react';
+import { Mission, MissionStatus, STATUS_CONFIG } from '../types/mission';
+import { ChevronLeft, ChevronRight, Clock, MapPin, Shield } from 'lucide-react';
 import { formatDateBr } from '../utils/csvHelper';
 
 interface TimelineScheduleProps {
@@ -191,31 +191,32 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
 
     return Object.entries(groups)
       .map(([operationName, opMissions]) => {
-        // Agrupa missões dentro da mesma operação que possuem o mesmo Local
-        const byLocal: Record<string, Mission[]> = {};
+        // Agrupa missões dentro da mesma operação mantendo juntas apenas as que possuírem
+        // a mesma Unidade Executora, o mesmo Local e Períodos iguais (data início e término)
+        const byUnitLocPeriod: Record<string, Mission[]> = {};
         opMissions.forEach((m) => {
-          const localKey = m.local.trim();
-          if (!byLocal[localKey]) byLocal[localKey] = [];
-          byLocal[localKey].push(m);
+          const unit = m.unidadeExecutora.trim();
+          const local = m.local.trim();
+          const start = m.dataInicio.trim();
+          const end = m.dataTermino.trim();
+          const groupKey = `${unit}__${local}__${start}__${end}`;
+          if (!byUnitLocPeriod[groupKey]) byUnitLocPeriod[groupKey] = [];
+          byUnitLocPeriod[groupKey].push(m);
         });
 
-        const mergedCards: MergedLocationCard[] = Object.entries(byLocal).map(
-          ([localName, locMissions]) => {
-            const sortedLocMissions = [...locMissions].sort(
+        const mergedCards: MergedLocationCard[] = Object.entries(byUnitLocPeriod).map(
+          ([groupKey, cardMissions]) => {
+            const sortedCardMissions = [...cardMissions].sort(
               (a, b) =>
                 TIMELINE_STATUS_ORDER[a.status] - TIMELINE_STATUS_ORDER[b.status] ||
                 a.dataInicio.localeCompare(b.dataInicio) ||
                 a.missao.localeCompare(b.missao)
             );
 
-            let minInicio = sortedLocMissions[0].dataInicio;
-            let maxTermino = sortedLocMissions[0].dataTermino;
-            let dominantStatus: MissionStatus = sortedLocMissions[0].status;
+            let dominantStatus: MissionStatus = sortedCardMissions[0].status;
             let bestPriority = TIMELINE_STATUS_ORDER[dominantStatus];
 
-            sortedLocMissions.forEach((m) => {
-              if (m.dataInicio < minInicio) minInicio = m.dataInicio;
-              if (m.dataTermino > maxTermino) maxTermino = m.dataTermino;
+            sortedCardMissions.forEach((m) => {
               const prio = TIMELINE_STATUS_ORDER[m.status];
               if (prio < bestPriority) {
                 bestPriority = prio;
@@ -224,20 +225,24 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
             });
 
             const uniqueMissoes = Array.from(
-              new Set(sortedLocMissions.map((m) => m.missao.trim()))
+              new Set(sortedCardMissions.map((m) => m.missao.trim()))
             );
             const uniqueUnidades = Array.from(
-              new Set(sortedLocMissions.map((m) => m.unidadeExecutora.trim()))
+              new Set(sortedCardMissions.map((m) => m.unidadeExecutora.trim()))
             );
 
+            const cardLocal = sortedCardMissions[0].local.trim();
+            const cardInicio = sortedCardMissions[0].dataInicio;
+            const cardTermino = sortedCardMissions[0].dataTermino;
+
             return {
-              id: `${operationName}__${localName}`,
-              local: localName,
-              missions: sortedLocMissions,
+              id: `${operationName}__${groupKey}`,
+              local: cardLocal,
+              missions: sortedCardMissions,
               missaoLabel: uniqueMissoes.join(' / '),
               unidadeLabel: uniqueUnidades.join(' · '),
-              dataInicio: minInicio,
-              dataTermino: maxTermino,
+              dataInicio: cardInicio,
+              dataTermino: cardTermino,
               dominantStatus,
             };
           }
@@ -597,30 +602,6 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
               );
             })}
           </div>
-        </div>
-      </div>
-
-      {/* Rodapé com Legenda de Cores de Status do Cronograma */}
-      <div className="px-4 py-2.5 bg-[#141C19] border-t border-[#24332C] flex flex-wrap items-center justify-between gap-3 text-xs">
-        <span className="text-[#889992] font-medium flex items-center gap-1.5">
-          <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Legenda de Cores de Status no Cronograma:</span>
-        </span>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {MISSION_STATUSES.map((status) => {
-            const cfg = STATUS_CONFIG[status];
-            return (
-              <div key={status} className="flex items-center gap-1.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                  style={{ backgroundColor: cfg.hex }}
-                />
-                <span className="text-[#C2CEC8] text-[11px] whitespace-nowrap">
-                  {cfg.label}
-                </span>
-              </div>
-            );
-          })}
         </div>
       </div>
     </section>

@@ -1292,6 +1292,7 @@ export default function App() {
         isOpen={isMissionModalOpen}
         initialMission={editingMission}
         isClone={isCloneModal}
+        allMissions={missions}
         onClose={() => {
           setIsMissionModalOpen(false);
           setEditingMission(null);

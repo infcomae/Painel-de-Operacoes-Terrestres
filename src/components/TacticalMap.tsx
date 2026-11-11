@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   LocationGroup,
-  MISSION_STATUSES,
   MissionStatus,
   STATUS_CONFIG,
 } from '../types/mission';
@@ -676,25 +675,6 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
           {!isOnline && (
             <span className="ml-2 text-yellow-400">· MODO VETORIAL OFFLINE</span>
           )}
-        </div>
-      </div>
-
-      {/* Legenda de Cores por Status no Rodapé do Mapa */}
-      <div className="px-4 py-2 bg-[#141C19] border-t border-[#24332C] flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-[#889992] font-medium">Legenda de Status nos Pinos:</span>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {MISSION_STATUSES.map((status) => {
-            const cfg = STATUS_CONFIG[status];
-            return (
-              <div key={status} className="flex items-center gap-1.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                  style={{ backgroundColor: cfg.hex }}
-                />
-                <span className="text-[#C2CEC8] whitespace-nowrap">{cfg.label}</span>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>

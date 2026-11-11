@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   ACTION_DESCRIPTIONS,
@@ -16,11 +16,13 @@ import {
   GeocodingSuggestion,
 } from '../services/geocodingService';
 import { Compass, Globe, Loader2, MapPin, Search, X } from 'lucide-react';
+import { HistoryAutocompleteInput } from './HistoryAutocompleteInput';
 
 interface MissionModalProps {
   isOpen: boolean;
   initialMission: Mission | null;
   isClone?: boolean;
+  allMissions?: Mission[];
   onClose: () => void;
   onSave: (missionData: Omit<Mission, 'id'>, existingId?: string) => void;
 }
@@ -29,6 +31,7 @@ export const MissionModal: React.FC<MissionModalProps> = ({
   isOpen,
   initialMission,
   isClone = false,
+  allMissions = [],
   onClose,
   onSave,
 }) => {
@@ -51,6 +54,34 @@ export const MissionModal: React.FC<MissionModalProps> = ({
   const [isSearchingGeo, setIsSearchingGeo] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(true);
   const [formError, setFormError] = useState<string>('');
+
+  // Sugestões extraídas dinamicamente do histórico de missões
+  const missionHistory = useMemo(() => {
+    const set = new Set<string>();
+    allMissions.forEach((m) => {
+      const val = (m.missao || '').trim();
+      if (val) set.add(val);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMissions]);
+
+  const operacaoHistory = useMemo(() => {
+    const set = new Set<string>();
+    allMissions.forEach((m) => {
+      const val = (m.operacao || '').trim();
+      if (val) set.add(val);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMissions]);
+
+  const atividadeHistory = useMemo(() => {
+    const set = new Set<string>();
+    allMissions.forEach((m) => {
+      const val = (m.atividade || '').trim();
+      if (val) set.add(val);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMissions]);
 
   // Sugestões de localidades online em tempo real
   const [suggestions, setSuggestions] = useState<GeocodingSuggestion[]>([]);
@@ -435,26 +466,25 @@ export const MissionModal: React.FC<MissionModalProps> = ({
                   <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
                     Missão *
                   </label>
-                  <input
-                    type="text"
+                  <HistoryAutocompleteInput
                     required
                     value={missao}
-                    onChange={(e) => setMissao(e.target.value)}
-                    placeholder="Ex: PSE, PCI"
-                    className="w-full px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm font-mono text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
+                    onChange={setMissao}
+                    suggestions={missionHistory}
+                    placeholder="Ex: PSE, PCI, ESC BAT"
+                    fontMono
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
                     Operação *
                   </label>
-                  <input
-                    type="text"
+                  <HistoryAutocompleteInput
                     required
                     value={operacao}
-                    onChange={(e) => setOperacao(e.target.value)}
-                    placeholder="Ex: PRESIDENCIAL, GVA"
-                    className="w-full px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
+                    onChange={setOperacao}
+                    suggestions={operacaoHistory}
+                    placeholder="Ex: PRESIDENCIAL, GVA, ÁGATA"
                   />
                 </div>
               </div>
@@ -463,12 +493,11 @@ export const MissionModal: React.FC<MissionModalProps> = ({
                 <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
                   Atividade a ser Executada
                 </label>
-                <input
-                  type="text"
+                <HistoryAutocompleteInput
                   value={atividade}
-                  onChange={(e) => setAtividade(e.target.value)}
+                  onChange={setAtividade}
+                  suggestions={atividadeHistory}
                   placeholder="Ex: Segurança de PCL, Contra Incêndio de Aeronaves"
-                  className="w-full px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
                 />
               </div>
 
