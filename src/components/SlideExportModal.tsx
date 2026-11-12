@@ -820,7 +820,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     // Cabeçalho superior do Cronograma Simplificado (Coluna Operação + Régua de Tempo)
     const opColW = 260;
-    const rulerH = 68;
+    const rulerH = 72;
     const trackX = tlX + opColW;
     const trackW = tlW - opColW;
 
@@ -829,7 +829,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     // Título da coluna esquerda da régua (sem subtítulo, centralizado verticalmente)
     ctx.fillStyle = isDark ? '#D5E0DB' : '#0F172A';
-    ctx.font = 'bold 25px "Barlow Condensed", "Public Sans", sans-serif';
+    ctx.font = 'bold 27px "Barlow Condensed", "Public Sans", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText('OPERAÇÃO / MISSÕES', tlX + 18, tlY + rulerH / 2 + 1);
 
@@ -852,12 +852,17 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         : isDark
         ? '#E2E8E5'
         : '#0F172A';
-      ctx.font = `${marker.isToday ? '700' : '600'} 23px "JetBrains Mono", monospace`;
-      ctx.fillText(
-        truncateCanvasText(ctx, marker.label, mw - 10),
-        mx + 8,
-        tlY + rulerH / 2
-      );
+      ctx.font = `${marker.isToday ? '700' : '600'} 25px "JetBrains Mono", monospace`;
+      const availMarkerW = mw - 10;
+      let markerText = marker.label;
+      if (ctx.measureText(markerText).width > availMarkerW) {
+        const dayOnly = marker.label.split(' ')[0];
+        markerText =
+          ctx.measureText(dayOnly).width <= availMarkerW
+            ? dayOnly
+            : truncateCanvasText(ctx, marker.label, availMarkerW);
+      }
+      ctx.fillText(markerText, mx + 6, tlY + rulerH / 2);
     });
 
     // Linha divisória horizontal abaixo da régua
@@ -877,11 +882,6 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     // Corpo do Cronograma Simplificado
     const bodyY = tlY + rulerH;
     const bodyH = tlH - rulerH;
-
-    const totalLanesCount = operationLanes.reduce(
-      (sum, op) => sum + Math.max(1, op.lanes.length),
-      0
-    );
 
     if (operationLanes.length === 0 || missions.length === 0) {
       ctx.fillStyle = isDark ? '#889992' : '#64748B';
@@ -908,33 +908,107 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       const opCount = operationLanes.length;
       const opPaddingV = opCount > 6 ? 8 : 12;
       const laneGap = 7;
-      const totalOpPadding = opCount * (opPaddingV * 2);
-      const totalLaneGaps = operationLanes.reduce(
-        (sum, op) => sum + Math.max(0, op.lanes.length - 1) * laneGap,
-        0
-      );
-
-      const computedLaneH = Math.min(
-        58,
-        Math.max(
-          38,
-          Math.floor(
-            (bodyH - totalOpPadding - totalLaneGaps) / Math.max(1, totalLanesCount)
-          )
-        )
-      );
 
       const minTs = minDate.getTime();
       const maxTs = maxDate.getTime();
       const rangeTs = Math.max(1, maxTs - minTs);
 
+      const getCardGeometry = (card: SlideTimelineCard) => {
+        const rawStartTs = new Date(`${card.dataInicio}T00:00:00`).getTime();
+        const rawEndTs = new Date(`${card.dataTermino}T23:59:59.999`).getTime();
+
+        const clampedStartTs = Math.max(minTs, Math.min(maxTs, rawStartTs));
+        const clampedEndTs = Math.max(clampedStartTs, Math.min(maxTs, rawEndTs));
+
+        const leftPct = Math.max(
+          0,
+          Math.min(100, ((clampedStartTs - minTs) / rangeTs) * 100)
+        );
+        const rawWidthPct = ((clampedEndTs - clampedStartTs) / rangeTs) * 100;
+        const widthPct = Math.max(2, Math.min(100 - leftPct, rawWidthPct));
+
+        const cardX = trackX + (leftPct / 100) * (trackW - 12) + 6;
+        const cardW = Math.max(28, (widthPct / 100) * (trackW - 12));
+        return { cardX, cardW };
+      };
+
+      const cardFitsSingleLine = (card: SlideTimelineCard, availTextW: number, fontSize: number) => {
+        if (availTextW <= 14) return true;
+        ctx.font = `700 ${fontSize}px "JetBrains Mono", monospace`;
+        const missaoW = ctx.measureText(card.missaoLabel).width;
+        const restText = `  ·  ${card.unidadeLabel}  ·  ${card.local}`;
+        ctx.font = `600 ${fontSize}px "Public Sans", sans-serif`;
+        const restW = ctx.measureText(restText).width;
+        return missaoW + restW <= availTextW;
+      };
+
+      // Classifica cada pista quanto à necessidade de 2 linhas (empilhamento)
+      const opLaneMeta = operationLanes.map((opGroup) =>
+        opGroup.lanes.map((laneCards) =>
+          laneCards.some((card) => {
+            const { cardW } = getCardGeometry(card);
+            return !cardFitsSingleLine(card, cardW - 20, 20);
+          })
+        )
+      );
+
+      let singleLanesCount = 0;
+      let doubleLanesCount = 0;
+      opLaneMeta.forEach((lanes) => {
+        if (lanes.length === 0) {
+          singleLanesCount += 1;
+        } else {
+          lanes.forEach((needsTwo) => {
+            if (needsTwo) doubleLanesCount += 1;
+            else singleLanesCount += 1;
+          });
+        }
+      });
+
+      const totalOpPadding = opCount * (opPaddingV * 2);
+      const totalLaneGaps = operationLanes.reduce(
+        (sum, op) => sum + Math.max(0, op.lanes.length - 1) * laneGap,
+        0
+      );
+      const availLaneBudget = Math.max(120, bodyH - totalOpPadding - totalLaneGaps);
+
+      const minSingleH = 40;
+      const minDoubleH = 56;
+      const idealSingleH = 54;
+      const idealDoubleH = 70;
+
+      const minTotalLaneH = singleLanesCount * minSingleH + doubleLanesCount * minDoubleH;
+      const idealTotalLaneH = singleLanesCount * idealSingleH + doubleLanesCount * idealDoubleH;
+
+      let singleLaneH = idealSingleH;
+      let doubleLaneH = idealDoubleH;
+
+      if (idealTotalLaneH > availLaneBudget) {
+        if (availLaneBudget <= minTotalLaneH) {
+          const ratio = availLaneBudget / Math.max(1, minTotalLaneH);
+          singleLaneH = Math.max(36, Math.floor(minSingleH * ratio));
+          doubleLaneH = Math.max(48, Math.floor(minDoubleH * ratio));
+        } else {
+          const factor =
+            (availLaneBudget - minTotalLaneH) /
+            Math.max(1, idealTotalLaneH - minTotalLaneH);
+          singleLaneH = Math.floor(minSingleH + factor * (idealSingleH - minSingleH));
+          doubleLaneH = Math.floor(minDoubleH + factor * (idealDoubleH - minDoubleH));
+        }
+      }
+
       let currentOpY = bodyY;
 
-      operationLanes.forEach((opGroup) => {
-        const lanesCount = Math.max(1, opGroup.lanes.length);
+      operationLanes.forEach((opGroup, opIdx) => {
+        const laneNeedsTwo = opLaneMeta[opIdx];
+        const laneHeights =
+          opGroup.lanes.length > 0
+            ? laneNeedsTwo.map((needsTwo) => (needsTwo ? doubleLaneH : singleLaneH))
+            : [singleLaneH];
         const lanesContentH =
-          lanesCount * computedLaneH + Math.max(0, lanesCount - 1) * laneGap;
-        const opRowH = Math.max(88, lanesContentH + opPaddingV * 2);
+          laneHeights.reduce((sum, h) => sum + h, 0) +
+          Math.max(0, laneHeights.length - 1) * laneGap;
+        const opRowH = Math.max(92, lanesContentH + opPaddingV * 2);
 
         if (currentOpY + 24 > tlY + tlH) return;
 
@@ -942,65 +1016,45 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         ctx.fillStyle = isDark ? '#121916' : '#F8FAFC';
         ctx.fillRect(tlX, currentOpY, opColW - 1, opRowH);
 
-        // Nome da Operação, 'X missões' e abaixo 'Efetivo: Y'
+        // Nome da Operação (25px) e abaixo 'Efetivo: Y' (23px), sem contador de missões
+        const opMaxW = opColW - 28;
         ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
         ctx.font = 'bold 25px "Barlow Condensed", "Public Sans", sans-serif';
+        const opIsTwoLines = ctx.measureText(opGroup.operationName).width > opMaxW;
         drawWrappedText(
           ctx,
           opGroup.operationName,
           tlX + 18,
-          currentOpY + opRowH / 2 - 24,
-          opColW - 28,
-          24
-        );
-
-        ctx.fillStyle = isDark ? '#94A39E' : '#475569';
-        ctx.font = '600 17px "JetBrains Mono", monospace';
-        const missionsCountLabel = `${opGroup.totalMissions} ${
-          opGroup.totalMissions === 1 ? 'missão' : 'missões'
-        }`;
-        ctx.fillText(
-          truncateCanvasText(ctx, missionsCountLabel, opColW - 28),
-          tlX + 18,
-          currentOpY + opRowH / 2 + 5
+          currentOpY + opRowH / 2 - (opIsTwoLines ? 20 : 15),
+          opMaxW,
+          25
         );
 
         ctx.fillStyle = isDark ? '#6EE7B7' : '#059669';
-        ctx.font = '600 17px "JetBrains Mono", monospace';
+        ctx.font = '600 23px "JetBrains Mono", monospace';
         const efetivoLabel = `Efetivo: ${opGroup.totalEfetivo}`;
         ctx.fillText(
-          truncateCanvasText(ctx, efetivoLabel, opColW - 28),
+          truncateCanvasText(ctx, efetivoLabel, opMaxW),
           tlX + 18,
-          currentOpY + opRowH / 2 + 30
+          currentOpY + opRowH / 2 + (opIsTwoLines ? 24 : 19)
         );
 
         const lanesStartY = currentOpY + (opRowH - lanesContentH) / 2;
+        let runningLaneY = lanesStartY;
 
-        // Renderiza os cards unificados por localidade nas pistas da operação (em linha única)
+        // Renderiza os cards unificados por localidade nas pistas da operação
         opGroup.lanes.forEach((laneCards, laneIdx) => {
-          const laneY = lanesStartY + laneIdx * (computedLaneH + laneGap);
+          const laneH = laneHeights[laneIdx];
+          const laneY = runningLaneY;
+          runningLaneY += laneH + laneGap;
 
           laneCards.forEach((card) => {
-            const rawStartTs = new Date(`${card.dataInicio}T00:00:00`).getTime();
-            const rawEndTs = new Date(`${card.dataTermino}T23:59:59.999`).getTime();
-
-            const clampedStartTs = Math.max(minTs, Math.min(maxTs, rawStartTs));
-            const clampedEndTs = Math.max(clampedStartTs, Math.min(maxTs, rawEndTs));
-
-            const leftPct = Math.max(
-              0,
-              Math.min(100, ((clampedStartTs - minTs) / rangeTs) * 100)
-            );
-            const rawWidthPct = ((clampedEndTs - clampedStartTs) / rangeTs) * 100;
-            const widthPct = Math.max(2, Math.min(100 - leftPct, rawWidthPct));
-
-            const cardX = trackX + (leftPct / 100) * (trackW - 12) + 6;
-            const cardW = Math.max(28, (widthPct / 100) * (trackW - 12));
+            const { cardX, cardW } = getCardGeometry(card);
             const stStyle = SLIDE_STATUS_STYLE[card.dominantStatus];
 
             // Fundo e borda do card na linha do tempo
             ctx.save();
-            drawRoundedRect(ctx, cardX, laneY, cardW, computedLaneH, 6);
+            drawRoundedRect(ctx, cardX, laneY, cardW, laneH, 6);
             ctx.fillStyle = isDark ? '#101714' : '#FFFFFF';
             ctx.fill();
             ctx.fillStyle = isDark ? stStyle.darkCardBg : stStyle.lightCardBg;
@@ -1012,43 +1066,88 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
             // Barra lateral sólida de status no card
             ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
-            ctx.fillRect(cardX, laneY, 7, computedLaneH);
+            ctx.fillRect(cardX, laneY, 7, laneH);
 
             const textStartX = cardX + 14;
             const availTextW = cardW - 20;
-            const centerY = laneY + computedLaneH / 2 + 0.5;
-            const cardFontSize =
-              computedLaneH >= 48 ? 19 : computedLaneH >= 42 ? 18 : computedLaneH >= 36 ? 16.5 : 15.5;
+            const centerY = laneY + laneH / 2 + 0.5;
 
             if (availTextW > 14) {
-              ctx.font = `700 ${cardFontSize}px "JetBrains Mono", monospace`;
-              const missaoW = ctx.measureText(card.missaoLabel).width;
+              const preferredFontSize =
+                laneH >= 66 ? 22 : laneH >= 56 ? 21 : laneH >= 50 ? 21 : 20;
 
-              if (missaoW >= availTextW - 18) {
-                ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
-                ctx.fillText(
-                  truncateCanvasText(
-                    ctx,
-                    `${card.missaoLabel} · ${card.unidadeLabel} · ${card.local}`,
-                    availTextW
-                  ),
-                  textStartX,
-                  centerY
-                );
-              } else {
-                // Parte 1: Missão em destaque colorido
+              let singleLineFontSize: number | null = null;
+              for (const fs of [preferredFontSize, 21, 20]) {
+                if (fs > preferredFontSize) continue;
+                if (cardFitsSingleLine(card, availTextW, fs)) {
+                  singleLineFontSize = fs;
+                  break;
+                }
+              }
+
+              if (singleLineFontSize !== null) {
+                // Cabe em linha única (20px a 22px)
+                ctx.font = `700 ${singleLineFontSize}px "JetBrains Mono", monospace`;
+                const missaoW = ctx.measureText(card.missaoLabel).width;
+
                 ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
                 ctx.fillText(card.missaoLabel, textStartX, centerY);
 
-                // Parte 2: Unidade Executora e Local na mesma linha com fonte ampliada
                 const restText = `  ·  ${card.unidadeLabel}  ·  ${card.local}`;
-                ctx.font = `600 ${cardFontSize}px "Public Sans", sans-serif`;
+                ctx.font = `600 ${singleLineFontSize}px "Public Sans", sans-serif`;
                 ctx.fillStyle = isDark ? '#F1F5F3' : '#0F172A';
-                ctx.fillText(
-                  truncateCanvasText(ctx, restText, availTextW - missaoW),
-                  textStartX + missaoW,
-                  centerY
-                );
+                ctx.fillText(restText, textStartX + missaoW, centerY);
+              } else {
+                // Informação não coube em 1 linha: empilhar em duas linhas (20px a 22px)
+                const stackFontSize = laneH >= 68 ? 22 : laneH >= 62 ? 21 : 20;
+                const lineGap = stackFontSize + 3;
+                const line1Y = laneY + laneH / 2 - lineGap / 2 + 0.5;
+                const line2Y = laneY + laneH / 2 + lineGap / 2 + 0.5;
+
+                ctx.font = `700 ${stackFontSize}px "JetBrains Mono", monospace`;
+                const missaoW = ctx.measureText(card.missaoLabel).width;
+
+                const unitSepText = `  ·  ${card.unidadeLabel}`;
+                ctx.font = `600 ${stackFontSize}px "Public Sans", sans-serif`;
+                const unitSepW = ctx.measureText(unitSepText).width;
+
+                if (missaoW + unitSepW <= availTextW) {
+                  // Linha 1: Missão · Unidade Executora | Linha 2: Local
+                  ctx.font = `700 ${stackFontSize}px "JetBrains Mono", monospace`;
+                  ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
+                  ctx.fillText(card.missaoLabel, textStartX, line1Y);
+
+                  ctx.font = `600 ${stackFontSize}px "Public Sans", sans-serif`;
+                  ctx.fillStyle = isDark ? '#F1F5F3' : '#0F172A';
+                  ctx.fillText(unitSepText, textStartX + missaoW, line1Y);
+
+                  ctx.fillText(
+                    truncateCanvasText(ctx, card.local, availTextW),
+                    textStartX,
+                    line2Y
+                  );
+                } else {
+                  // Linha 1: Missão | Linha 2: Unidade Executora · Local
+                  ctx.font = `700 ${stackFontSize}px "JetBrains Mono", monospace`;
+                  ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
+                  ctx.fillText(
+                    truncateCanvasText(ctx, card.missaoLabel, availTextW),
+                    textStartX,
+                    line1Y
+                  );
+
+                  ctx.font = `600 ${stackFontSize}px "Public Sans", sans-serif`;
+                  ctx.fillStyle = isDark ? '#F1F5F3' : '#0F172A';
+                  ctx.fillText(
+                    truncateCanvasText(
+                      ctx,
+                      `${card.unidadeLabel} · ${card.local}`,
+                      availTextW
+                    ),
+                    textStartX,
+                    line2Y
+                  );
+                }
               }
             }
 
