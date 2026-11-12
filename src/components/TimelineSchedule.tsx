@@ -191,20 +191,19 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
 
     return Object.entries(groups)
       .map(([operationName, opMissions]) => {
-        // Agrupa missões dentro da mesma operação mantendo juntas apenas as que possuírem
-        // a mesma Unidade Executora, o mesmo Local e Períodos iguais (data início e término)
-        const byUnitLocPeriod: Record<string, Mission[]> = {};
+        // Agrupa missões dentro da mesma operação mantendo juntas as que possuírem
+        // a mesma Localidade e Períodos iguais (data início e término), independentemente da unidade
+        const byLocPeriod: Record<string, Mission[]> = {};
         opMissions.forEach((m) => {
-          const unit = m.unidadeExecutora.trim();
           const local = m.local.trim();
           const start = m.dataInicio.trim();
           const end = m.dataTermino.trim();
-          const groupKey = `${unit}__${local}__${start}__${end}`;
-          if (!byUnitLocPeriod[groupKey]) byUnitLocPeriod[groupKey] = [];
-          byUnitLocPeriod[groupKey].push(m);
+          const groupKey = `${local.toUpperCase()}__${start}__${end}`;
+          if (!byLocPeriod[groupKey]) byLocPeriod[groupKey] = [];
+          byLocPeriod[groupKey].push(m);
         });
 
-        const mergedCards: MergedLocationCard[] = Object.entries(byUnitLocPeriod).map(
+        const mergedCards: MergedLocationCard[] = Object.entries(byLocPeriod).map(
           ([groupKey, cardMissions]) => {
             const sortedCardMissions = [...cardMissions].sort(
               (a, b) =>

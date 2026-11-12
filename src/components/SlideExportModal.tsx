@@ -406,20 +406,19 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     const lanesByOp: SlideOperationLane[] = Object.entries(byOp)
       .map(([operationName, opMissions]) => {
-        // Agrupa missões dentro da mesma operação mantendo juntas apenas as que possuírem
-        // a mesma Unidade Executora, o mesmo Local e Períodos iguais (data início e término)
-        const byUnitLocPeriod: Record<string, Mission[]> = {};
+        // Agrupa missões dentro da mesma operação mantendo juntas as que possuírem
+        // o mesmo Local e Períodos iguais (data início e término), independentemente da unidade
+        const byLocPeriod: Record<string, Mission[]> = {};
         opMissions.forEach((m) => {
-          const unit = m.unidadeExecutora.trim();
           const loc = m.local.trim();
           const start = m.dataInicio.trim();
           const end = m.dataTermino.trim();
-          const groupKey = `${unit}__${loc}__${start}__${end}`;
-          if (!byUnitLocPeriod[groupKey]) byUnitLocPeriod[groupKey] = [];
-          byUnitLocPeriod[groupKey].push(m);
+          const groupKey = `${loc.toUpperCase()}__${start}__${end}`;
+          if (!byLocPeriod[groupKey]) byLocPeriod[groupKey] = [];
+          byLocPeriod[groupKey].push(m);
         });
 
-        const mergedCards: SlideTimelineCard[] = Object.entries(byUnitLocPeriod).map(
+        const mergedCards: SlideTimelineCard[] = Object.entries(byLocPeriod).map(
           ([groupKey, locMissions]) => {
             const sortedLoc = [...locMissions].sort(
               (a, b) =>
@@ -820,8 +819,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     ctx.clip();
 
     // Cabeçalho superior do Cronograma Simplificado (Coluna Operação + Régua de Tempo)
-    const opColW = 240;
-    const rulerH = 62;
+    const opColW = 260;
+    const rulerH = 68;
     const trackX = tlX + opColW;
     const trackW = tlW - opColW;
 
@@ -830,9 +829,9 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     // Título da coluna esquerda da régua (sem subtítulo, centralizado verticalmente)
     ctx.fillStyle = isDark ? '#D5E0DB' : '#0F172A';
-    ctx.font = 'bold 21px "Barlow Condensed", "Public Sans", sans-serif';
+    ctx.font = 'bold 25px "Barlow Condensed", "Public Sans", sans-serif';
     ctx.textBaseline = 'middle';
-    ctx.fillText('OPERAÇÃO / MISSÕES', tlX + 16, tlY + rulerH / 2 + 1);
+    ctx.fillText('OPERAÇÃO / MISSÕES', tlX + 18, tlY + rulerH / 2 + 1);
 
     // Marcadores de Datas na Régua de Tempo
     timeMarkers.forEach((marker) => {
@@ -853,7 +852,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         : isDark
         ? '#E2E8E5'
         : '#0F172A';
-      ctx.font = `${marker.isToday ? '700' : '600'} 16px "JetBrains Mono", monospace`;
+      ctx.font = `${marker.isToday ? '700' : '600'} 23px "JetBrains Mono", monospace`;
       ctx.fillText(
         truncateCanvasText(ctx, marker.label, mw - 10),
         mx + 8,
@@ -886,7 +885,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     if (operationLanes.length === 0 || missions.length === 0) {
       ctx.fillStyle = isDark ? '#889992' : '#64748B';
-      ctx.font = '600 18px "Public Sans", sans-serif';
+      ctx.font = '600 22px "Public Sans", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
         'Nenhuma missão encontrada para o período e filtros selecionados.',
@@ -916,9 +915,9 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       );
 
       const computedLaneH = Math.min(
-        52,
+        58,
         Math.max(
-          34,
+          38,
           Math.floor(
             (bodyH - totalOpPadding - totalLaneGaps) / Math.max(1, totalLanesCount)
           )
@@ -935,7 +934,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         const lanesCount = Math.max(1, opGroup.lanes.length);
         const lanesContentH =
           lanesCount * computedLaneH + Math.max(0, lanesCount - 1) * laneGap;
-        const opRowH = Math.max(78, lanesContentH + opPaddingV * 2);
+        const opRowH = Math.max(88, lanesContentH + opPaddingV * 2);
 
         if (currentOpY + 24 > tlY + tlH) return;
 
@@ -945,34 +944,34 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
         // Nome da Operação, 'X missões' e abaixo 'Efetivo: Y'
         ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
-        ctx.font = 'bold 21px "Barlow Condensed", "Public Sans", sans-serif';
+        ctx.font = 'bold 25px "Barlow Condensed", "Public Sans", sans-serif';
         drawWrappedText(
           ctx,
           opGroup.operationName,
-          tlX + 16,
-          currentOpY + opRowH / 2 - 20,
-          opColW - 26,
-          20
+          tlX + 18,
+          currentOpY + opRowH / 2 - 24,
+          opColW - 28,
+          24
         );
 
         ctx.fillStyle = isDark ? '#94A39E' : '#475569';
-        ctx.font = '600 14px "JetBrains Mono", monospace';
+        ctx.font = '600 17px "JetBrains Mono", monospace';
         const missionsCountLabel = `${opGroup.totalMissions} ${
           opGroup.totalMissions === 1 ? 'missão' : 'missões'
         }`;
         ctx.fillText(
-          truncateCanvasText(ctx, missionsCountLabel, opColW - 24),
-          tlX + 16,
-          currentOpY + opRowH / 2 + 2
+          truncateCanvasText(ctx, missionsCountLabel, opColW - 28),
+          tlX + 18,
+          currentOpY + opRowH / 2 + 5
         );
 
         ctx.fillStyle = isDark ? '#6EE7B7' : '#059669';
-        ctx.font = '600 14px "JetBrains Mono", monospace';
+        ctx.font = '600 17px "JetBrains Mono", monospace';
         const efetivoLabel = `Efetivo: ${opGroup.totalEfetivo}`;
         ctx.fillText(
-          truncateCanvasText(ctx, efetivoLabel, opColW - 24),
-          tlX + 16,
-          currentOpY + opRowH / 2 + 22
+          truncateCanvasText(ctx, efetivoLabel, opColW - 28),
+          tlX + 18,
+          currentOpY + opRowH / 2 + 30
         );
 
         const lanesStartY = currentOpY + (opRowH - lanesContentH) / 2;
@@ -1001,7 +1000,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
             // Fundo e borda do card na linha do tempo
             ctx.save();
-            drawRoundedRect(ctx, cardX, laneY, cardW, computedLaneH, 5);
+            drawRoundedRect(ctx, cardX, laneY, cardW, computedLaneH, 6);
             ctx.fillStyle = isDark ? '#101714' : '#FFFFFF';
             ctx.fill();
             ctx.fillStyle = isDark ? stStyle.darkCardBg : stStyle.lightCardBg;
@@ -1013,12 +1012,13 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
             // Barra lateral sólida de status no card
             ctx.fillStyle = isDark ? stStyle.hex : stStyle.lightAccentHex;
-            ctx.fillRect(cardX, laneY, 6, computedLaneH);
+            ctx.fillRect(cardX, laneY, 7, computedLaneH);
 
-            const textStartX = cardX + 12;
-            const availTextW = cardW - 18;
+            const textStartX = cardX + 14;
+            const availTextW = cardW - 20;
             const centerY = laneY + computedLaneH / 2 + 0.5;
-            const cardFontSize = computedLaneH >= 40 ? 15.5 : 14;
+            const cardFontSize =
+              computedLaneH >= 48 ? 19 : computedLaneH >= 42 ? 18 : computedLaneH >= 36 ? 16.5 : 15.5;
 
             if (availTextW > 14) {
               ctx.font = `700 ${cardFontSize}px "JetBrains Mono", monospace`;
