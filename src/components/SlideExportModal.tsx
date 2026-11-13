@@ -327,6 +327,45 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
   const [copyFeedback, setCopyFeedback] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Exclui missões 'Em Planejamento' da imagem gerada (mapa e cronograma)
+  const slideMissions = useMemo(
+    () => missions.filter((m) => m.status !== 'Em Planejamento'),
+    [missions]
+  );
+
+  const slideLocationGroups = useMemo(() => {
+    return locationGroups
+      .map((group) => {
+        const filteredMissions = group.missions.filter(
+          (m) => m.status !== 'Em Planejamento'
+        );
+        if (filteredMissions.length === 0) return null;
+
+        let dominantStatus: MissionStatus = filteredMissions[0].status;
+        let bestPriority = STATUS_CONFIG[dominantStatus].priority;
+        filteredMissions.forEach((m) => {
+          const prio = STATUS_CONFIG[m.status].priority;
+          if (prio < bestPriority) {
+            bestPriority = prio;
+            dominantStatus = m.status;
+          }
+        });
+
+        const totalMilitares = filteredMissions.reduce(
+          (acc, m) => acc + (m.qtdMilitares || 0),
+          0
+        );
+
+        return {
+          ...group,
+          missions: filteredMissions,
+          dominantStatus,
+          totalMilitares,
+        };
+      })
+      .filter((g): g is LocationGroup => g !== null);
+  }, [locationGroups]);
+
   // Calcula a janela da linha do tempo conforme o período selecionado nos filtros
   const {
     minDate,
@@ -342,16 +381,16 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     let startIso = dateStartFilter;
     let endIso = dateEndFilter;
 
-    if (!startIso && missions.length > 0) {
-      startIso = missions.reduce(
+    if (!startIso && slideMissions.length > 0) {
+      startIso = slideMissions.reduce(
         (min, m) => (m.dataInicio < min ? m.dataInicio : min),
-        missions[0].dataInicio
+        slideMissions[0].dataInicio
       );
     }
-    if (!endIso && missions.length > 0) {
-      endIso = missions.reduce(
+    if (!endIso && slideMissions.length > 0) {
+      endIso = slideMissions.reduce(
         (max, m) => (m.dataTermino > max ? m.dataTermino : max),
-        missions[0].dataTermino
+        slideMissions[0].dataTermino
       );
     }
 
@@ -399,7 +438,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     const maxTs = end.getTime();
     const byOp: Record<string, Mission[]> = {};
 
-    missions.forEach((m) => {
+    slideMissions.forEach((m) => {
       const op = m.operacao.trim() || 'Operação Não Especificada';
       if (!byOp[op]) byOp[op] = [];
       byOp[op].push(m);
@@ -533,7 +572,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       timeMarkers: markers,
       operationLanes: lanesByOp,
     };
-  }, [missions, dateStartFilter, dateEndFilter]);
+  }, [slideMissions, dateStartFilter, dateEndFilter]);
 
   const generateSlideCanvas = async () => {
     setIsGenerating(true);
@@ -584,37 +623,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     ctx.textBaseline = 'middle';
     ctx.fillText(slideTitle.toUpperCase(), 32, headerH / 2 + 1);
 
-    // Legenda de Status no canto superior direito do cabeçalho (fonte e indicadores ampliados)
-    const legendOrder: MissionStatus[] = [
-      'Cancelada',
-      'Finalizada',
-      'Em Andamento',
-      'Agd Execução',
-      'Em Planejamento',
-    ];
-    let legendX = WIDTH - 32;
-    ctx.font = '700 17px "Public Sans", sans-serif';
-    for (let i = legendOrder.length - 1; i >= 0; i--) {
-      const st = legendOrder[i];
-      const stStyle = SLIDE_STATUS_STYLE[st];
-      const label = stStyle.displayLabel;
-      const textW = ctx.measureText(label).width;
-      legendX -= textW;
-
-      ctx.fillStyle = isDark ? '#E2E8E5' : '#0F172A';
-      ctx.fillText(label, legendX, 42);
-
-      legendX -= 22;
-      ctx.beginPath();
-      ctx.arc(legendX + 8, 42, 8, 0, Math.PI * 2);
-      ctx.fillStyle = stStyle.hex;
-      ctx.fill();
-
-      legendX -= 26;
-    }
-
     // =========================================================================
-    // 3. LADO ESQUERDO: MAPA (PADRÃO OSM)
+    // 3. LADO ESQUERDO: MAPA (PADRÃO OSM) + RODAPÉ COM LEGENDA
     // =========================================================================
     const pad = 24;
     const contentY = headerH + pad;
@@ -623,12 +633,20 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     const mapY = contentY;
     const mapW = 730;
     const mapH = contentH;
+    const mapFooterH = 56;
+    const mapViewportH = mapH - mapFooterH;
 
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 8);
-    ctx.fillStyle = '#AAD3DF';
-    ctx.fill();
     ctx.clip();
+
+    // Área útil do mapa acima do rodapé da legenda
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(mapX, mapY, mapW, mapViewportH);
+    ctx.clip();
+    ctx.fillStyle = '#AAD3DF';
+    ctx.fillRect(mapX, mapY, mapW, mapViewportH);
 
     let centerLat = -14.2;
     let centerLng = -52.5;
@@ -638,10 +656,10 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     let targetMinLat = -34.2;
     let targetMaxLat = 6.0;
 
-    // Se o modo for 'fit', enquadra exatamente as localidades com missões ativas
-    if (mapFrameMode === 'fit' && locationGroups.length > 0) {
-      const lats = locationGroups.map((g) => g.lat);
-      const lngs = locationGroups.map((g) => g.lng);
+    // Se o modo for 'fit', enquadra exatamente as localidades com missões ativas (sem Em Planejamento)
+    if (mapFrameMode === 'fit' && slideLocationGroups.length > 0) {
+      const lats = slideLocationGroups.map((g) => g.lat);
+      const lngs = slideLocationGroups.map((g) => g.lng);
       const minLat = Math.min(...lats);
       const maxLat = Math.max(...lats);
       const minLng = Math.min(...lngs);
@@ -679,12 +697,12 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     const targetBottomY = latToWorldY(targetMinLat, mapZoom);
 
     const scaleX = mapW / Math.max(1, Math.abs(targetRightX - targetLeftX));
-    const scaleY = mapH / Math.max(1, Math.abs(targetBottomY - targetTopY));
+    const scaleY = mapViewportH / Math.max(1, Math.abs(targetBottomY - targetTopY));
     const mapScale = Math.min(scaleX, scaleY);
 
     const worldToCanvas = (wx: number, wy: number) => ({
       x: mapX + mapW / 2 + (wx - centerWorldX) * mapScale,
-      y: mapY + mapH / 2 + (wy - centerWorldY) * mapScale,
+      y: mapY + mapViewportH / 2 + (wy - centerWorldY) * mapScale,
     });
 
     const latLngToMapXY = (lat: number, lng: number) =>
@@ -695,10 +713,10 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       Math.pow(2, mapZoom) - 1,
       Math.floor((centerWorldX + mapW / (2 * mapScale)) / 256)
     );
-    const minTileY = Math.max(0, Math.floor((centerWorldY - mapH / (2 * mapScale)) / 256));
+    const minTileY = Math.max(0, Math.floor((centerWorldY - mapViewportH / (2 * mapScale)) / 256));
     const maxTileY = Math.min(
       Math.pow(2, mapZoom) - 1,
-      Math.floor((centerWorldY + mapH / (2 * mapScale)) / 256)
+      Math.floor((centerWorldY + mapViewportH / (2 * mapScale)) / 256)
     );
 
     const tilePromises: Promise<{
@@ -757,8 +775,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       }
     });
 
-    // Pinos das Localidades
-    const slideClusters = clusterSlidePins(locationGroups, latLngToMapXY);
+    // Pinos das Localidades (excluindo missões 'Em Planejamento')
+    const slideClusters = clusterSlidePins(slideLocationGroups, latLngToMapXY);
 
     slideClusters.forEach((cluster) => {
       const pt = latLngToMapXY(cluster.lat, cluster.lng);
@@ -798,7 +816,59 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     });
 
     ctx.textAlign = 'left';
-    ctx.restore();
+    ctx.restore(); // encerra clip da área útil do mapa
+
+    // Rodapé do Mapa: Legenda de Status (sem 'Em Planejamento')
+    const footerY = mapY + mapViewportH;
+    ctx.fillStyle = isDark ? '#111815' : '#FFFFFF';
+    ctx.fillRect(mapX, footerY, mapW, mapFooterH);
+
+    ctx.strokeStyle = isDark ? '#24332C' : '#CBD5E1';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(mapX, footerY);
+    ctx.lineTo(mapX + mapW, footerY);
+    ctx.stroke();
+
+    const legendOrder: MissionStatus[] = [
+      'Cancelada',
+      'Finalizada',
+      'Em Andamento',
+      'Agd Execução',
+    ];
+    ctx.font = '700 21px "Public Sans", sans-serif';
+    ctx.textBaseline = 'middle';
+
+    const itemDotGap = 9;
+    const itemRadius = 9;
+    const itemSpacing = 24;
+    const legendWidths = legendOrder.map((st) => {
+      const label = SLIDE_STATUS_STYLE[st].displayLabel;
+      return itemRadius * 2 + itemDotGap + ctx.measureText(label).width;
+    });
+    const totalLegendW =
+      legendWidths.reduce((sum, w) => sum + w, 0) +
+      (legendOrder.length - 1) * itemSpacing;
+
+    let cursorX = mapX + (mapW - totalLegendW) / 2;
+    const legendCenterY = footerY + mapFooterH / 2 + 0.5;
+
+    legendOrder.forEach((st, idx) => {
+      const stStyle = SLIDE_STATUS_STYLE[st];
+      const label = stStyle.displayLabel;
+
+      ctx.beginPath();
+      ctx.arc(cursorX + itemRadius, legendCenterY, itemRadius, 0, Math.PI * 2);
+      ctx.fillStyle = stStyle.hex;
+      ctx.fill();
+
+      ctx.fillStyle = isDark ? '#E2E8E5' : '#0F172A';
+      ctx.fillText(label, cursorX + itemRadius * 2 + itemDotGap, legendCenterY);
+
+      cursorX += legendWidths[idx] + itemSpacing;
+    });
+
+    ctx.restore(); // encerra clip arredondado do mapa
 
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 8);
     ctx.strokeStyle = isDark ? '#263530' : '#CBD5E1';
@@ -884,7 +954,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     const bodyY = tlY + rulerH;
     const bodyH = tlH - rulerH;
 
-    if (operationLanes.length === 0 || missions.length === 0) {
+    if (operationLanes.length === 0 || slideMissions.length === 0) {
       ctx.fillStyle = isDark ? '#889992' : '#64748B';
       ctx.font = '600 22px "Public Sans", sans-serif';
       ctx.textAlign = 'center';
@@ -1191,7 +1261,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     mapFrameMode,
     operationLanes,
     timeMarkers,
-    locationGroups,
+    slideLocationGroups,
   ]);
 
   if (!isOpen) return null;
@@ -1347,7 +1417,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setMapFrameMode('fit')}
-                disabled={locationGroups.length === 0}
+                disabled={slideLocationGroups.length === 0}
                 className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-40 ${
                   mapFrameMode === 'fit'
                     ? 'bg-[#1D2B25] text-emerald-300 font-semibold border border-emerald-500/40'
