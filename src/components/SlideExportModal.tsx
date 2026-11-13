@@ -383,7 +383,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       const dayNum = String(d.getDate()).padStart(2, '0');
       const monthStr = d
         .toLocaleDateString('pt-BR', { month: 'short' })
-        .replace('.', '');
+        .replace('.', '')
+        .toUpperCase();
 
       markers.push({
         leftPct,
@@ -819,8 +820,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
     ctx.clip();
 
     // Cabeçalho superior do Cronograma Simplificado (Coluna Operação + Régua de Tempo)
-    const opColW = 260;
-    const rulerH = 72;
+    const opColW = 276;
+    const rulerH = 76;
     const trackX = tlX + opColW;
     const trackW = tlW - opColW;
 
@@ -829,7 +830,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
     // Título da coluna esquerda da régua (sem subtítulo, centralizado verticalmente)
     ctx.fillStyle = isDark ? '#D5E0DB' : '#0F172A';
-    ctx.font = 'bold 27px "Barlow Condensed", "Public Sans", sans-serif';
+    ctx.font = 'bold 30px "Barlow Condensed", "Public Sans", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText('OPERAÇÃO / MISSÕES', tlX + 18, tlY + rulerH / 2 + 1);
 
@@ -852,7 +853,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         : isDark
         ? '#E2E8E5'
         : '#0F172A';
-      ctx.font = `${marker.isToday ? '700' : '600'} 25px "JetBrains Mono", monospace`;
+      ctx.font = `${marker.isToday ? '700' : '600'} 27px "JetBrains Mono", monospace`;
       const availMarkerW = mw - 10;
       let markerText = marker.label;
       if (ctx.measureText(markerText).width > availMarkerW) {
@@ -947,7 +948,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         opGroup.lanes.map((laneCards) =>
           laneCards.some((card) => {
             const { cardW } = getCardGeometry(card);
-            return !cardFitsSingleLine(card, cardW - 20, 20);
+            return !cardFitsSingleLine(card, cardW - 20, 22);
           })
         )
       );
@@ -972,10 +973,10 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       );
       const availLaneBudget = Math.max(120, bodyH - totalOpPadding - totalLaneGaps);
 
-      const minSingleH = 40;
-      const minDoubleH = 56;
-      const idealSingleH = 54;
-      const idealDoubleH = 70;
+      const minSingleH = 44;
+      const minDoubleH = 62;
+      const idealSingleH = 58;
+      const idealDoubleH = 78;
 
       const minTotalLaneH = singleLanesCount * minSingleH + doubleLanesCount * minDoubleH;
       const idealTotalLaneH = singleLanesCount * idealSingleH + doubleLanesCount * idealDoubleH;
@@ -986,8 +987,8 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
       if (idealTotalLaneH > availLaneBudget) {
         if (availLaneBudget <= minTotalLaneH) {
           const ratio = availLaneBudget / Math.max(1, minTotalLaneH);
-          singleLaneH = Math.max(36, Math.floor(minSingleH * ratio));
-          doubleLaneH = Math.max(48, Math.floor(minDoubleH * ratio));
+          singleLaneH = Math.max(38, Math.floor(minSingleH * ratio));
+          doubleLaneH = Math.max(54, Math.floor(minDoubleH * ratio));
         } else {
           const factor =
             (availLaneBudget - minTotalLaneH) /
@@ -1008,7 +1009,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         const lanesContentH =
           laneHeights.reduce((sum, h) => sum + h, 0) +
           Math.max(0, laneHeights.length - 1) * laneGap;
-        const opRowH = Math.max(92, lanesContentH + opPaddingV * 2);
+        const opRowH = Math.max(98, lanesContentH + opPaddingV * 2);
 
         if (currentOpY + 24 > tlY + tlH) return;
 
@@ -1016,27 +1017,27 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
         ctx.fillStyle = isDark ? '#121916' : '#F8FAFC';
         ctx.fillRect(tlX, currentOpY, opColW - 1, opRowH);
 
-        // Nome da Operação (25px) e abaixo 'Efetivo: Y' (23px), sem contador de missões
+        // Nome da Operação (27px) e abaixo 'Efetivo: Y' (25px), sem contador de missões
         const opMaxW = opColW - 28;
         ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
-        ctx.font = 'bold 25px "Barlow Condensed", "Public Sans", sans-serif';
+        ctx.font = 'bold 27px "Barlow Condensed", "Public Sans", sans-serif';
         const opIsTwoLines = ctx.measureText(opGroup.operationName).width > opMaxW;
         drawWrappedText(
           ctx,
           opGroup.operationName,
           tlX + 18,
-          currentOpY + opRowH / 2 - (opIsTwoLines ? 20 : 15),
+          currentOpY + opRowH / 2 - (opIsTwoLines ? 22 : 17),
           opMaxW,
-          25
+          27
         );
 
         ctx.fillStyle = isDark ? '#6EE7B7' : '#059669';
-        ctx.font = '600 23px "JetBrains Mono", monospace';
+        ctx.font = '600 25px "JetBrains Mono", monospace';
         const efetivoLabel = `Efetivo: ${opGroup.totalEfetivo}`;
         ctx.fillText(
           truncateCanvasText(ctx, efetivoLabel, opMaxW),
           tlX + 18,
-          currentOpY + opRowH / 2 + (opIsTwoLines ? 24 : 19)
+          currentOpY + opRowH / 2 + (opIsTwoLines ? 26 : 21)
         );
 
         const lanesStartY = currentOpY + (opRowH - lanesContentH) / 2;
@@ -1074,10 +1075,10 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
 
             if (availTextW > 14) {
               const preferredFontSize =
-                laneH >= 66 ? 22 : laneH >= 56 ? 21 : laneH >= 50 ? 21 : 20;
+                laneH >= 56 ? 25 : laneH >= 50 ? 24 : laneH >= 45 ? 23 : 22;
 
               let singleLineFontSize: number | null = null;
-              for (const fs of [preferredFontSize, 21, 20]) {
+              for (const fs of [25, 24, 23, 22]) {
                 if (fs > preferredFontSize) continue;
                 if (cardFitsSingleLine(card, availTextW, fs)) {
                   singleLineFontSize = fs;
@@ -1086,7 +1087,7 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
               }
 
               if (singleLineFontSize !== null) {
-                // Cabe em linha única (20px a 22px)
+                // Cabe em linha única (22px a 25px)
                 ctx.font = `700 ${singleLineFontSize}px "JetBrains Mono", monospace`;
                 const missaoW = ctx.measureText(card.missaoLabel).width;
 
@@ -1098,8 +1099,9 @@ export const SlideExportModal: React.FC<SlideExportModalProps> = ({
                 ctx.fillStyle = isDark ? '#F1F5F3' : '#0F172A';
                 ctx.fillText(restText, textStartX + missaoW, centerY);
               } else {
-                // Informação não coube em 1 linha: empilhar em duas linhas (20px a 22px)
-                const stackFontSize = laneH >= 68 ? 22 : laneH >= 62 ? 21 : 20;
+                // Informação não coube em 1 linha: empilhar em duas linhas (22px a 25px)
+                const stackFontSize =
+                  laneH >= 74 ? 25 : laneH >= 68 ? 24 : laneH >= 63 ? 23 : 22;
                 const lineGap = stackFontSize + 3;
                 const line1Y = laneY + laneH / 2 - lineGap / 2 + 0.5;
                 const line2Y = laneY + laneH / 2 + lineGap / 2 + 0.5;

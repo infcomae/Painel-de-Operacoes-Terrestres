@@ -452,7 +452,7 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
           {/* Régua de Tempo (Eixo Superior com os 7 Dias a contar da Data Atual) */}
           <div className="sticky top-0 z-20 flex bg-[#16201C] border-b border-[#24332C]">
             {/* Coluna fixa do nome da Operação */}
-            <div className="w-64 sm:w-72 shrink-0 px-4 py-2 border-r border-[#24332C] bg-[#16201C] text-xs font-semibold text-[#C2CEC8] uppercase tracking-wider font-display">
+            <div className="w-64 sm:w-72 shrink-0 px-4 py-2 border-r border-[#24332C] bg-[#16201C] text-[15px] font-semibold text-[#C2CEC8] uppercase tracking-wider font-display">
               Operação / Missões
             </div>
 
@@ -468,7 +468,7 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
                   }}
                 >
                   <span
-                    className={`font-mono text-[10px] tabular-nums whitespace-nowrap ${
+                    className={`font-mono text-[14px] tabular-nums whitespace-nowrap ${
                       marker.isToday ? 'text-emerald-400 font-bold' : 'text-[#C2CEC8]'
                     }`}
                   >
@@ -507,10 +507,7 @@ export const TimelineSchedule: React.FC<TimelineScheduleProps> = ({
                         {opGroup.operationName}
                       </h3>
                     </div>
-                    <div className="mt-1 text-[11px] font-mono text-[#889992] flex items-center gap-1.5">
-                      <span>{opGroup.totalMissions} {opGroup.totalMissions === 1 ? 'missão' : 'missões'}</span>
-                    </div>
-                    <div className="mt-0.5 text-[11px] font-mono text-emerald-400/90 flex items-center gap-1.5">
+                    <div className="mt-1 text-[11px] font-mono text-emerald-400/90 flex items-center gap-1.5">
                       <span>Efetivo: {opGroup.totalEfetivo}</span>
                     </div>
                   </div>
