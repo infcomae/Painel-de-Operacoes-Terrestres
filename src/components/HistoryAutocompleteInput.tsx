@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, History, Check } from 'lucide-react';
+import { ChevronDown, Check } from 'lucide-react';
 
 interface HistoryAutocompleteInputProps {
   value: string;
@@ -10,6 +10,7 @@ interface HistoryAutocompleteInputProps {
   className?: string;
   fontMono?: boolean;
   id?: string;
+  dropdownDirection?: 'down' | 'up';
 }
 
 export const HistoryAutocompleteInput: React.FC<HistoryAutocompleteInputProps> = ({
@@ -21,6 +22,7 @@ export const HistoryAutocompleteInput: React.FC<HistoryAutocompleteInputProps> =
   className = '',
   fontMono = false,
   id,
+  dropdownDirection = 'down',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -139,17 +141,11 @@ export const HistoryAutocompleteInput: React.FC<HistoryAutocompleteInputProps> =
 
       {/* Dropdown de Sugestões do Histórico */}
       {isOpen && filteredSuggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#101714] border border-[#2A3C34] rounded-md shadow-2xl overflow-hidden max-h-52 overflow-y-auto animate-in fade-in-50 duration-100">
-          <div className="px-3 py-1.5 bg-[#14201B] border-b border-[#24332C] flex items-center justify-between text-[10px] text-[#889992] font-mono uppercase tracking-wider">
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <History className="w-3 h-3" />
-              Histórico Operacional
-            </span>
-            <span className="text-[#6A7F75]">
-              {filteredSuggestions.length} {filteredSuggestions.length === 1 ? 'opção' : 'opções'}
-            </span>
-          </div>
-
+        <div
+          className={`absolute left-0 right-0 z-50 bg-[#101714] border border-[#2A3C34] rounded-md shadow-2xl overflow-hidden max-h-52 overflow-y-auto animate-in fade-in-50 duration-100 ${
+            dropdownDirection === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+        >
           <div className="divide-y divide-[#1D2924]">
             {filteredSuggestions.map((item, index) => {
               const isSelected = item.toLowerCase() === (value || '').trim().toLowerCase();

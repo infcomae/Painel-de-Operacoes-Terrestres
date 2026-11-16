@@ -83,6 +83,24 @@ export const MissionModal: React.FC<MissionModalProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allMissions]);
 
+  const unidadeExecutoraHistory = useMemo(() => {
+    const set = new Set<string>();
+    allMissions.forEach((m) => {
+      const val = (m.unidadeExecutora || '').trim();
+      if (val) set.add(val);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMissions]);
+
+  const fracaoTropaHistory = useMemo(() => {
+    const set = new Set<string>();
+    allMissions.forEach((m) => {
+      const val = (m.fracaoTropa || '').trim();
+      if (val) set.add(val);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMissions]);
+
   // Sugestões de localidades online em tempo real
   const [suggestions, setSuggestions] = useState<GeocodingSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -745,26 +763,26 @@ export const MissionModal: React.FC<MissionModalProps> = ({
                   <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
                     Unidade Executora *
                   </label>
-                  <input
-                    type="text"
+                  <HistoryAutocompleteInput
                     required
                     value={unidadeExecutora}
-                    onChange={(e) => setUnidadeExecutora(e.target.value)}
+                    onChange={setUnidadeExecutora}
+                    suggestions={unidadeExecutoraHistory}
                     placeholder="Ex: GSD-BV / 1º GDAAE"
-                    className="w-full px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
+                    dropdownDirection="up"
                   />
                 </div>
                 <div className="sm:col-span-4">
                   <label className="block text-xs font-medium text-[#C2CEC8] mb-1">
                     Fração de Tropa *
                   </label>
-                  <input
-                    type="text"
+                  <HistoryAutocompleteInput
                     required
                     value={fracaoTropa}
-                    onChange={(e) => setFracaoTropa(e.target.value)}
+                    onChange={setFracaoTropa}
+                    suggestions={fracaoTropaHistory}
                     placeholder="Ex: EQP, GC, PEL"
-                    className="w-full px-3 py-2 bg-[#0D1311] border border-[#263530] rounded text-sm text-[#F1F5F3] focus:outline-none focus:border-emerald-500 placeholder:text-[#4A5D54]"
+                    dropdownDirection="up"
                   />
                 </div>
                 <div className="sm:col-span-3">
